@@ -21,12 +21,12 @@
 #include "actions.h"
 #include "c2.h"
 
-#include "cnn/training.h"
-#include "cnn/cnn.h"
-#include "cnn/expr.h"
-#include "cnn/nodes.h"
-#include "cnn/lstm.h"
-#include "cnn/rnn.h"
+#include "dynet/training.h"
+#include "dynet/dynet.h"
+#include "dynet/expr.h"
+#include "dynet/nodes.h"
+#include "dynet/lstm.h"
+#include "dynet/rnn.h"
 
 cpyp::Corpus corpus;
 
@@ -61,8 +61,8 @@ unsigned CHAR_SIZE = 255; //size of ascii chars... Miguel
 bool USE_DROPOUT = false;
 float DROPOUT = 0.0f;
 
-using namespace cnn::expr;
-using namespace cnn;
+using namespace dynet::expr;
+using namespace dynet;
 using namespace std;
 using namespace badname;
 namespace po = boost::program_options;
@@ -72,7 +72,7 @@ unordered_map<unsigned, vector<float>> pretrained;
 string param_fname;
 string output_conll;
 
-void init_command_line(int argc, char** argv, po::variables_map* conf) {
+void init_command_line(int argc, const char *const *argv, po::variables_map* conf) {
 
     po::options_description opts("Configuration options");
     opts.add_options()("training_data,T", po::value<string>(),
@@ -134,60 +134,60 @@ struct ParserBuilder {
     LSTMBuilder buffer_lstm;
     LSTMBuilder action_lstm;
 
-    LookupParameters* p_tok; // word embeddings
-    LookupParameters* p_emb; // pre-trained word embeddings (not updated)
-    LookupParameters* p_pos; // POS tag embeddings
-    LookupParameters* p_pred; // predicate embeddings
-    LookupParameters* p_act; // input action embeddings
-    LookupParameters* p_syn_label; // syntactic label embeddings
-    LookupParameters* p_sem_label; // semantic label embeddings TODO(Swabha): needed?
+    LookupParameter p_tok; // word embeddings
+    LookupParameter p_emb; // pre-trained word embeddings (not updated)
+    LookupParameter p_pos; // POS tag embeddings
+    LookupParameter p_pred; // predicate embeddings
+    LookupParameter p_act; // input action embeddings
+    LookupParameter p_syn_label; // syntactic label embeddings
+    LookupParameter p_sem_label; // semantic label embeddings TODO(Swabha): needed?
 
-    Parameters* p_parsact_bias; // parser state bias
-    Parameters* p_act2parsact; // action LSTM to parser state
-    Parameters* p_buf2parsact; // buffer LSTM to parser state
-    Parameters* p_synst2parsact; // syntactic stack LSTM to parser state
-    Parameters* p_semst2parsact; // semantic stack LSTM to parser state
+    Parameter p_parsact_bias; // parser state bias
+    Parameter p_act2parsact; // action LSTM to parser state
+    Parameter p_buf2parsact; // buffer LSTM to parser state
+    Parameter p_synst2parsact; // syntactic stack LSTM to parser state
+    Parameter p_semst2parsact; // semantic stack LSTM to parser state
 
-    Parameters* p_head_comp; // head matrix for composition function
-    Parameters* p_mod_comp; // dependency matrix for composition function
-    Parameters* p_label_comp; // relation matrix for composition function
-    Parameters* p_comp_bias; // composition function bias
+    Parameter p_head_comp; // head matrix for composition function
+    Parameter p_mod_comp; // dependency matrix for composition function
+    Parameter p_label_comp; // relation matrix for composition function
+    Parameter p_comp_bias; // composition function bias
 
-    Parameters* p_head_comp2; // head matrix for semantic composition function
-    Parameters* p_mod_comp2; // dependency matrix for semantic composition function
-    Parameters* p_label_comp2; // relation matrix for semantic composition function
-    Parameters* p_comp2_bias; // semantic composition function bias
+    Parameter p_head_comp2; // head matrix for semantic composition function
+    Parameter p_mod_comp2; // dependency matrix for semantic composition function
+    Parameter p_label_comp2; // relation matrix for semantic composition function
+    Parameter p_comp2_bias; // semantic composition function bias
 
-    Parameters* p_pred_comp; // predicate matrix for predicate composition function
-    Parameters* p_comp3_bias; // semantic composition function bias
+    Parameter p_pred_comp; // predicate matrix for predicate composition function
+    Parameter p_comp3_bias; // semantic composition function bias
 
-    Parameters* p_tok2l; // word to LSTM input
-    Parameters* p_pos2l; // POS to LSTM input
-    Parameters* p_emb2l; // pre-trained word embeddings to LSTM input
-    Parameters* p_inp_bias; // LSTM input bias
+    Parameter p_tok2l; // word to LSTM input
+    Parameter p_pos2l; // POS to LSTM input
+    Parameter p_emb2l; // pre-trained word embeddings to LSTM input
+    Parameter p_inp_bias; // LSTM input bias
 
-    Parameters* p_parse2next_act;   // parser state to action
-    Parameters* p_act_bias;  // action bias
+    Parameter p_parse2next_act;   // parser state to action
+    Parameter p_act_bias;  // action bias
 
-    Parameters* p_act_start;  // empty action set
-    Parameters* p_buf_guard;  // end of buffer
-    Parameters* p_stack_guard;  // end of stack
-    Parameters* p_sem_stack_guard;  // end of stack
+    Parameter p_act_start;  // empty action set
+    Parameter p_buf_guard;  // end of buffer
+    Parameter p_stack_guard;  // end of stack
+    Parameter p_sem_stack_guard;  // end of stack
 
     // character model params by Miguel
-    Parameters* p_start_of_word;  // dummy <s> symbol
-    Parameters* p_end_of_word; // dummy </s> symbol
-    LookupParameters* char_emb; // mapping of characters to vectors
+    Parameter p_start_of_word;  // dummy <s> symbol
+    Parameter p_end_of_word; // dummy </s> symbol
+    LookupParameter char_emb; // mapping of characters to vectors
 
     LSTMBuilder fw_char_lstm;
     LSTMBuilder bw_char_lstm;
 
     explicit ParserBuilder(Model* model,
             const unordered_map<unsigned, vector<float>>& pretrained) :
-            stack_lstm(LAYERS, LSTM_INPUT_DIM, HIDDEN_DIM, model), sem_stack_lstm(
-                    LAYERS, LSTM_INPUT_DIM, HIDDEN_DIM, model), buffer_lstm(
-                    LAYERS, LSTM_INPUT_DIM, HIDDEN_DIM, model), action_lstm(
-                    LAYERS, ACTION_DIM, HIDDEN_DIM, model),
+            stack_lstm(LAYERS, LSTM_INPUT_DIM, HIDDEN_DIM, *model), sem_stack_lstm(
+                    LAYERS, LSTM_INPUT_DIM, HIDDEN_DIM, *model), buffer_lstm(
+                    LAYERS, LSTM_INPUT_DIM, HIDDEN_DIM, *model), action_lstm(
+                    LAYERS, ACTION_DIM, HIDDEN_DIM, *model),
 
             p_tok(model->add_lookup_parameters(VOCAB_SIZE, { INPUT_DIM, 1 })), p_pred(
                     model->add_lookup_parameters(PRED_SIZE, { PRED_DIM, 1 })), p_act(
@@ -232,9 +232,9 @@ struct ParserBuilder {
             p_end_of_word(model->add_parameters( { LSTM_INPUT_DIM, 1 })), //Miguel
             char_emb(model->add_lookup_parameters(CHAR_SIZE, { INPUT_DIM, 1 })), //Miguel
             fw_char_lstm(LAYERS, LSTM_INPUT_DIM, LSTM_CHAR_OUTPUT_DIM / 2,
-                    model), //Miguel
+                    *model), //Miguel
             bw_char_lstm(LAYERS, LSTM_INPUT_DIM, LSTM_CHAR_OUTPUT_DIM / 2,
-                    model) /*Miguel*/{
+                    *model) /*Miguel*/{
 
         if (USE_POS) {
             p_pos = model->add_lookup_parameters(POS_SIZE, { POS_DIM, 1 });
@@ -244,7 +244,7 @@ struct ParserBuilder {
             p_emb = model->add_lookup_parameters(corpus.tok_dict.size() + 1, {
                     PRETRAINED_DIM, 1 });
             for (auto it : pretrained) {
-                p_emb->Initialize(it.first, it.second);
+                p_emb.initialize(it.first, it.second);
             }
             p_emb2l = model->add_parameters(
                     { LSTM_INPUT_DIM, PRETRAINED_DIM });
@@ -337,7 +337,7 @@ struct ParserBuilder {
         if (USE_POS)
             pos2l = parameter(*hg, p_pos2l);
         Expression emb2l;
-        if (p_emb2l)
+        if (&p_emb2l)
             emb2l = parameter(*hg, p_emb2l);
         Expression inp_bias = parameter(*hg, p_inp_bias);
 
@@ -438,7 +438,7 @@ struct ParserBuilder {
             } else {
                 i_i = affine_transform( { inp_bias, tok2l, w });
             }
-            if (p_emb && pretrained.count(raw_sent[i])) {
+            if (&p_emb && pretrained.count(raw_sent[i])) {
                 Expression t = const_lookup(*hg, p_emb, raw_sent[i]);
                 i_i = affine_transform( { i_i, emb2l, t });
             }
@@ -535,7 +535,7 @@ struct ParserBuilder {
             }
 
             Expression prob_dist = log_softmax(pars_act); //, current_valid_actions);
-            vector<float> prob_dist_vec = as_vector(hg->incremental_forward());
+            vector<float> prob_dist_vec = as_vector(hg->incremental_forward(prob_dist));
             // so it can be iterated over
             // do the argmax
             double best_score = prob_dist_vec[0]; //[current_valid_actions[0]];
@@ -650,8 +650,8 @@ struct ParserBuilder {
                 stack_lstm.add_input(buffer.back());
                 stack.pop_back();
                 stack.push_back(nlcomposed);
-                stack.push_back(buffer.back());
-                stacki.push_back(bufferi.back());
+                stack.push_back((Expression &&) buffer.back());
+                stacki.push_back((int &&) bufferi.back());
 
             } else if (chosen_act_enum == REDUCE) { // Syntactic REDUCE
                 assert(stack.size() > 1); // dummy symbol means > 1 (not >= 1)
@@ -662,8 +662,8 @@ struct ParserBuilder {
             } else if (chosen_act_enum == SHIFT) { // Syntactic SHIFT
                 assert(buffer.size() > 1); // dummy symbol means > 2 (not >= 2)
                 stack_lstm.add_input(buffer.back());
-                stack.push_back(buffer.back());
-                stacki.push_back(bufferi.back());
+                stack.push_back((Expression &&) buffer.back());
+                stacki.push_back((int &&) bufferi.back());
 
             } else if (chosen_act_enum == SWAP) { // Semantic SWAP
                 assert(sem_stack.size() > 2);
@@ -691,8 +691,8 @@ struct ParserBuilder {
                 assert(buffer.size() > 1);
 
                 sem_stack_lstm.add_input(buffer.back());
-                sem_stack.push_back(buffer.back());
-                sem_stacki.push_back(bufferi.back());
+                sem_stack.push_back((Expression &&) buffer.back());
+                sem_stacki.push_back((int &&) bufferi.back());
 
                 buffer_lstm.rewind_one_step();
                 buffer.pop_back();
@@ -799,7 +799,7 @@ struct ParserBuilder {
                 buffer.pop_back();
                 buffer.push_back(nlcomposed);
 
-                partial.pred_pos.insert(bufferi.back());
+                partial.pred_pos.insert((int &&) bufferi.back());
                 partial.predicate_lemmas[bufferi.back()] =
                         corpus.act_dict.Convert(chosen_act_id);
 
@@ -824,187 +824,6 @@ struct ParserBuilder {
         assert(tot_neglogprob.pg != nullptr);
         return partial;
     }
-
-    /** run beam search // TODO(Miguel): do we need this?
-     vector<unsigned> log_prob_parser_beam(ComputationGraph* hg,
-     const vector<unsigned>& raw_sent,  // raw sentence
-     const vector<unsigned>& sent,  // sent with OOVs replaced
-     const vector<unsigned>& sentPos, const vector<string>& setOfActions,
-     unsigned beam_size, double* log_prob) {
-     abort();
-     #if 0
-     vector<unsigned> results;
-     ParserState init;
-
-     stack_lstm.new_graph(hg);
-     buffer_lstm.new_graph(hg);
-     action_lstm.new_graph(hg);
-     // variables in the computation graph representing the parameters
-     Expression pbias = parameter(*hg, p_parsact_bias);
-     Expression H = parameter(*hg, p_head_comp);
-     Expression D = parameter(*hg, p_mod_comp);
-     Expression R = parameter(*hg, p_label_comp);
-     Expression cbias = parameter(*hg, p_comp_bias);
-     Expression S = parameter(*hg, p_synst2parsact);
-     Expression B = parameter(*hg, p_buf2parsact);
-     Expression A = parameter(*hg, p_act2parsact);
-     Expression ib = parameter(*hg, p_inp_bias);
-     Expression w2l = parameter(*hg, p_tok2l);
-     Expression p2l;
-     if (USE_POS)
-     i_p2l = parameter(*hg, p_pos2l);
-     Expression t2l;
-     if (p_emb2l)
-     i_t2l = parameter(*hg, p_emb2l);
-     Expression p2a = parameter(*hg, p_parse2next_act);
-     Expression abias = parameter(*hg, p_act_bias);
-     Expression action_start = parameter(*hg, p_act_start);
-
-     action_lstm.add_input(i_action_start, hg);
-
-     vector<Expression> buffer(sent.size() + 1);// variables representing word embeddings (possibly including POS info)
-     vector<int> bufferi(sent.size() + 1);// position of the words in the sentence
-
-     // precompute buffer representation from left to right
-     for (unsigned i = 0; i < sent.size(); ++i) {
-     assert(sent[i] < VOCAB_SIZE);
-     Expression w = lookup(*hg, p_tok, sent[i]);
-     Expression i;
-     if (USE_POS) {
-     Expression p = lookup(*hg, p_pos, sentPos[i]);
-     i_i = hg->add_function<AffineTransform>( {i_ib, i_w2l, i_w, i_p2l, i_p});
-     } else {
-     i_i = hg->add_function<AffineTransform>( {i_ib, i_w2l, i_w});
-     }
-     if (p_emb && pretrained.count(raw_sent[i])) {
-     Expression t = hg->add_const_lookup(p_emb, sent[i]);
-     i_i = hg->add_function<AffineTransform>( {i_i, i_t2l, i_t});
-     }
-     Expression inl = hg->add_function<Rectify>( {i_i});
-     buffer[sent.size() - i] = i_inl;
-     bufferi[sent.size() - i] = i;
-     }
-     // dummy symbol to represent the empty buffer
-     buffer[0] = parameter(*hg, p_buf_guard);
-     bufferi[0] = -999;
-     for (auto& b : buffer)
-     buffer_lstm.add_input(b, hg);
-
-     vector<Expression> stack;// variables representing subtree embeddings
-     vector<int> stacki;// position of words in the sentence of head of subtree
-     stack.push_back(parameter(*hg, p_stack_guard));
-     stacki.push_back(-999);// not used for anything
-     // drive dummy symbol on stack through LSTM
-     stack_lstm.add_input(stack.back(), hg);
-
-     init.stack_lstm = stack_lstm;
-     init.buffer_lstm = buffer_lstm;
-     init.action_lstm = action_lstm;
-     init.buffer = buffer;
-     init.bufferi = bufferi;
-     init.stack = stack;
-     init.stacki = stacki;
-     init.results = results;
-     init.score = 0;
-     if (init.stacki.size() ==1 && init.bufferi.size() == 1) {assert(!"bad0");}
-
-     vector<ParserState> pq;
-     pq.push_back(init);
-     vector<ParserState> completed;
-     while (pq.size() > 0) {
-     const ParserState cur = pq.back();
-     pq.pop_back();
-     if (cur.stack.size() == 2 && cur.buffer.size() == 1) {
-     completed.push_back(cur);
-     if (completed.size() == BEAM_SIZE) break;
-     continue;
-     }
-
-     // get list of possible actions for the current parser state
-     vector<unsigned> current_valid_actions;
-     for (auto a: all_act_ids) {
-     if (is_action_forbidden(setOfActions[a], cur.buffer.size(), cur.stack.size(), stacki))
-     continue;
-     current_valid_actions.push_back(a);
-     }
-
-     // p_embed = pbias + S * slstm + B * blstm + A * almst
-     Expression p_emb = hg->add_function<AffineTransform>( {i_pbias, i_S, cur.stack_lstm.back(), i_B, cur.buffer_lstm.back(), i_A, cur.action_lstm.back()});
-
-     // nlp_t = tanh(p_embed)
-     Expression nlp_t = hg->add_function<Rectify>( {i_p_t});
-
-     // r_t = abias + p2a * nlp
-     Expression r_t = hg->add_function<AffineTransform>( {i_abias, i_p2a, i_nlp_t});
-
-     //cerr << "CVAs: " << current_valid_actions.size() << " (cur.buf=" << cur.bufferi.size() << " buf.sta=" << cur.stacki.size() << ")\n";
-     // adist = log_softmax(r_t)
-     hg->add_function<RestrictedLogSoftmax>( {i_r_t}, current_valid_actions);
-     vector<float> adist = as_vector(hg->incremental_forward());
-
-     for (auto action : current_valid_actions) {
-     pq.resize(pq.size() + 1);
-     ParserState& ns = pq.back();
-     ns = cur;  // copy current state to new state
-     ns.score += adist[action];
-     ns.results.push_back(action);
-
-     // add current action to action LSTM
-     Expression action = lookup(*hg, p_act, action);
-     ns.action_lstm.add_input(i_action, hg);
-
-     // do action
-     const string& actionString=setOfActions[action];
-     //cerr << "A=" << actionString << " Bsize=" << buffer.size() << " Ssize=" << stack.size() << endl;
-     const char ac = actionString[0];
-     if (ac =='S') {  // SHIFT
-     assert(ns.buffer.size() > 1);// dummy symbol means > 1 (not >= 1)
-     ns.stack.push_back(ns.buffer.back());
-     ns.stack_lstm.add_input(ns.buffer.back(), hg);
-     ns.buffer.pop_back();
-     ns.buffer_lstm.rewind_one_step();
-     ns.stacki.push_back(cur.bufferi.back());
-     ns.bufferi.pop_back();
-     } else { // LEFT or RIGHT
-     assert(ns.stack.size() > 2);// dummy symbol means > 2 (not >= 2)
-     assert(ac == 'L' || ac == 'R');
-     Expression dep, head;
-     unsigned depi = 0, headi = 0;
-     (ac == 'R' ? dep : head) = ns.stack.back();
-     (ac == 'R' ? depi : headi) = ns.stacki.back();
-     ns.stack.pop_back();
-     ns.stacki.pop_back();
-     (ac == 'R' ? head : dep) = ns.stack.back();
-     (ac == 'R' ? headi : depi) = ns.stacki.back();
-     ns.stack.pop_back();
-     ns.stacki.pop_back();
-     // get relation embedding from action (TODO: convert to relation from action?)
-     Expression relation = lookup(*hg, p_syn_label, action);
-
-     // composed = cbias + H * head + D * dep + R * relation
-     Expression composed = affine_transform( {cbias, H, head, D, dep, R, relation});
-     // nlcomposed = tanh(composed)
-     Expression nlcomposed = tanh(composed);
-     ns.stack_lstm.rewind_one_step();
-     ns.stack_lstm.rewind_one_step();
-     ns.stack_lstm.add_input(i_nlcomposed, hg);
-     ns.stack.push_back(i_nlcomposed);
-     ns.stacki.push_back(headi);
-     }
-     } // all curent actions
-     prune(pq, BEAM_SIZE);
-     } // beam search
-     assert(completed.size() > 0);
-     prune(completed, 1);
-     results = completed.back().results;
-     assert(completed.back().stack.size() == 2);// guard symbol, root
-     assert(completed.back().stacki.size() == 2);
-     assert(completed.back().buffer.size() == 1);// guard symbol
-     assert(completed.back().bufferi.size() == 1);
-     *log_prob = completed.back().score;
-     return results;
-     #endif
-     }**/
 };
 
 void signal_callback_handler(int /* signum */) {
@@ -1331,7 +1150,7 @@ void do_training(Model model, ParserBuilder parser,
             vector<unsigned> tsentence = train_sent;
             if (UNK_STRATEGY == 1) {
                 for (auto& w : tsentence) {
-                    if (singletons.count(w) && cnn::rand01() < UNK_PROB) {
+                    if (singletons.count(w) && dynet::rand01() < UNK_PROB) {
                         w = kUNK;
                     }
                 }
@@ -1447,7 +1266,7 @@ void do_training(Model model, ParserBuilder parser,
 }
 
 int main(int argc, char** argv) {
-    cnn::Initialize(argc, argv);
+    dynet::initialize(argc, argv);
 
     cerr << "COMMAND:";
     for (unsigned i = 0; i < static_cast<unsigned>(argc); ++i)
@@ -1455,7 +1274,7 @@ int main(int argc, char** argv) {
     cerr << endl;
 
     po::variables_map conf;
-    init_command_line(argc, argv, &conf);
+    init_command_line(argc, (const char *const *) argv, &conf);
 
     USE_POS = conf.count("use_pos_tags");
     USE_SPELLING = conf.count("use_spelling"); //Miguel
