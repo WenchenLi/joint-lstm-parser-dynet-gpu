@@ -598,16 +598,6 @@ struct ParserBuilder {
 
             Expression head, mod, composed, nlcomposed;
 
-//			if (!build_training_graph) {
-//				cerr << "[";
-//				for (unsigned ii = 0; ii < stacki.size(); ++ii) cerr << stacki[ii] << " ";
-//				cerr << "][";
-//				for (unsigned ii = 0; ii < bufferi.size(); ++ii) cerr << bufferi[ii] << " ";
-//				cerr << "]\n[";
-//				for (unsigned ii = 0; ii < sem_stacki.size(); ++ii) cerr << sem_stacki[ii] << " ";
-//				cerr << "] " << best_action << endl;
-//			}
-
             if (chosen_act_enum == LEFT) { // Syntactic LEFT-ARC
                 assert(stack.size() > 1);
                 assert(buffer.size() > 1);
