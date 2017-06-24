@@ -72,6 +72,7 @@ struct JointParse {
     map<int, string> predicate_lemmas; // This should be sorted, temp fix by also having the vector below
     set<int> pred_pos;
 
+
     bool contains_syn_arc(int child, int parent, string label) {
         if (syn_arcs.find(child) == syn_arcs.end())
             return false;

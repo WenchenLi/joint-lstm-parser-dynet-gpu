@@ -234,7 +234,8 @@ struct ParserBuilder {
             fw_char_lstm(LAYERS, LSTM_INPUT_DIM, LSTM_CHAR_OUTPUT_DIM / 2,
                     *model), //Miguel
             bw_char_lstm(LAYERS, LSTM_INPUT_DIM, LSTM_CHAR_OUTPUT_DIM / 2,
-                    *model) /*Miguel*/{
+                    *model) /*Miguel*/
+    {
 
         if (USE_POS) {
             p_pos = model->add_lookup_parameters(POS_SIZE, { POS_DIM, 1 });
@@ -838,9 +839,6 @@ void print_joint_conll(const std::vector<unsigned>& sent,
     }
 
     for (unsigned i = 0; i < sent.size() - 1; ++i) {
-//			assert(i < sent_unk.size()
-//					&& ((sent[i] == corpus.get_or_add_word(cpyp::Corpus::UNK) && sent_unk[i].size() > 0)
-//						|| (sent[i] != corpus.get_or_add_word(cpyp::Corpus::UNK) && sent_unk[i].size() == 0 && int_tok_map.find(sent[i]) != int_tok_map.end())));
         string tok =
                 (sent_oov[i].size() > 0) ?
                         sent_oov[i] : corpus.tok_dict.Convert(sent[i]);
