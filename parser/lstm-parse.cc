@@ -243,16 +243,17 @@ struct ParserBuilder {
         }
         if (pretrained.size() > 0) { // using word vectors
             p_emb = model->add_lookup_parameters(corpus.tok_dict.size() + 1, {
-                    PRETRAINED_DIM, 1 });
+                    PRETRAINED_DIM, 1});
             for (auto it : pretrained) {
                 p_emb.initialize(it.first, it.second);
             }
             p_emb2l = model->add_parameters(
-                    { LSTM_INPUT_DIM, PRETRAINED_DIM });
-        } else {
-            p_emb = nullptr;
-            p_emb2l = nullptr;
+                    {LSTM_INPUT_DIM, PRETRAINED_DIM});
         }
+//        } else { TODO if random init word embedding
+//            p_emb = nullptr;
+//            p_emb2l = nullptr;
+//        }
     }
 
     // given the first character of a UTF8 block, find out how wide it is
@@ -466,8 +467,9 @@ struct ParserBuilder {
         sem_stacki.push_back(-999);
         sem_stack_lstm.add_input(sem_stack.back()); // drive dummy symbol on stack through LSTM
 
-        vector < Expression > log_probs;
+//        vector < Expression > log_probs;
         JointParse partial;
+
         Parent fake_p = { -1, "ERROR" };
         for (unsigned i = 0; i < raw_sent.size(); i++) {
             partial.syn_arcs[i] = fake_p;
@@ -581,7 +583,7 @@ struct ParserBuilder {
 
             ++act_seq_id;
             //log_probs.push_back(pick(prob_dist, chosen_act_id));
-            log_probs.push_back(pick(prob_dist, chosen_idx));
+            partial.log_probs.push_back(pick(prob_dist, chosen_idx));
             results.push_back(chosen_act_id);
 
             // add current action to action LSTM
@@ -811,8 +813,7 @@ struct ParserBuilder {
         assert(buffer.size() == 1); // guard symbol
         assert(bufferi.size() == 1);
 
-        Expression tot_neglogprob = -sum(log_probs); // last thing added to computation graph
-        assert(tot_neglogprob.pg != nullptr);
+
         return partial;
     }
 };
@@ -1098,7 +1099,7 @@ void do_training(Model model, ParserBuilder parser,
     bool soft_link_created = false;
     signal(SIGINT, signal_callback_handler);
 
-    SimpleSGDTrainer sgd(&model); // MomentumSGDTrainer sgd(&model);
+    SimpleSGDTrainer sgd(model); // MomentumSGDTrainer sgd(&model);
     sgd.eta_decay = 0.08; // 0.05;
 
     vector<unsigned> order(corpus.num_sents);
@@ -1149,16 +1150,18 @@ void do_training(Model model, ParserBuilder parser,
             const map<int, unsigned>& train_preds =
                     corpus.preds_train[order[si]];
             ComputationGraph hg;
-
-            parser.log_prob_parser(&hg, train_sent, tsentence, train_pos,
+            JointParse partial;
+            partial = parser.log_prob_parser(&hg, train_sent, tsentence, train_pos,
                     train_preds, train_gold_acts, &right);
-            double lp = as_scalar(hg.incremental_forward());
+            Expression tot_neglogprob = -sum(partial.log_probs);
+
+            double lp = as_scalar(hg.incremental_forward(tot_neglogprob));
             if (lp < 0) {
                 cerr << "Log prob < 0 on sentence " << order[si] << ": lp="
                         << lp << endl;
                 assert(lp >= 0.0);
             }
-            hg.backward();
+            hg.backward(tot_neglogprob);
             sgd.update(1.0);
             llh += lp;
             ++si;

@@ -10,6 +10,9 @@
 #include <boost/serialization/unordered_map.hpp>
 #endif
 
+#include "dynet/expr.h"
+
+
 using namespace std;
 
 namespace badname {
@@ -71,6 +74,7 @@ struct JointParse {
     map<int, vector<Parent>> sem_arcs;
     map<int, string> predicate_lemmas; // This should be sorted, temp fix by also having the vector below
     set<int> pred_pos;
+    vector < dynet::expr::Expression > log_probs;
 
 
     bool contains_syn_arc(int child, int parent, string label) {

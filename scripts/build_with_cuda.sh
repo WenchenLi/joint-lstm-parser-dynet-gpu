@@ -10,3 +10,6 @@
 cd build
 cmake .. -DBACKEND=cuda
 make  -j8
+
+
+#cmake .. -DEIGEN3_INCLUDE_DIR=/usr/local/include/eigen3 -DBACKEND=cuda
