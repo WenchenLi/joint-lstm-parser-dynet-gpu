@@ -498,6 +498,7 @@ struct ParserBuilder {
                 unsigned lemma_id = gold_preds.find(bufferi.back())->second;
                 auto lpmk = corpus.lemma_practs_map.find(lemma_id);
                 if (lpmk == corpus.lemma_practs_map.end()) {
+                    break;
                     current_valid_actions.push_back(
                             corpus.act_dict.Convert(corpus.PR_UNK));
                 } else {
@@ -804,14 +805,14 @@ struct ParserBuilder {
 
             prev_act_enum = chosen_act_enum;
         }
-        assert(stack.size() == 2); // guard symbol, root
-        assert(stacki.size() == 2);
-
-        assert(sem_stack.size() == 2); // guard symbol
-        assert(sem_stacki.size() == 2);
-
-        assert(buffer.size() == 1); // guard symbol
-        assert(bufferi.size() == 1);
+//        assert(stack.size() == 2); // guard symbol, root
+//        assert(stacki.size() == 2);
+//
+//        assert(sem_stack.size() == 2); // guard symbol
+//        assert(sem_stacki.size() == 2);
+//
+//        assert(buffer.size() == 1); // guard symbol
+//        assert(bufferi.size() == 1);
 
 
         return partial;
