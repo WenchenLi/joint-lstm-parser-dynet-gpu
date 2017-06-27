@@ -1100,7 +1100,7 @@ void do_training(Model model, ParserBuilder parser,
     bool soft_link_created = false;
     signal(SIGINT, signal_callback_handler);
 
-    SimpleSGDTrainer sgd(model); // MomentumSGDTrainer sgd(&model);
+    SimpleSGDTrainer sgd(model); // MomentumSGDTrainer sgd(&model);TODO learning rate
     sgd.eta_decay = 0.08; // 0.05;
 
     vector<unsigned> order(corpus.num_sents);
