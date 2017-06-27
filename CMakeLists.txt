@@ -30,6 +30,22 @@ function(find_cudnn)
   endif()
 endfunction()
 
+
+if(BACKEND)
+  message("-- BACKEND: ${BACKEND}")
+else()
+  message("-- BACKEND not specified, defaulting to eigen.")
+  set(BACKEND "eigen")
+endif()
+
+if(BACKEND MATCHES "^eigen$")
+  set(WITH_EIGEN_BACKEND 1)
+elseif(BACKEND MATCHES "^cuda$")
+  set(WITH_CUDA_BACKEND 1)
+else()
+  message(SEND_ERROR "BACKEND must be eigen or cuda")
+endif()
+
 if (WITH_CUDA_BACKEND)
   find_package(CUDA REQUIRED)
   set(CUDA_TOOLKIT_ROOT_DIR ${CUDA_ROOT})
@@ -50,31 +66,43 @@ if (WITH_CUDA_BACKEND)
 endif()
 
 # look for Eigen
-get_filename_component(EIGEN3_INCLUDE_DIR "${EIGEN3_INCLUDE_DIR}" REALPATH BASE_DIR "${CMAKE_BINARY_DIR}")
-message("-- Eigen dir is " ${EIGEN3_INCLUDE_DIR})
-find_package(Eigen3 REQUIRED)
-include_directories(${EIGEN3_INCLUDE_DIR})
-
-FIND_PACKAGE(Threads REQUIRED)
-set(LIBS ${LIBS} ${CMAKE_THREAD_LIBS_INIT})
-
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config.h.cmake ${CMAKE_CURRENT_BINARY_DIR}/config.h)
-include_directories(${CMAKE_CURRENT_BINARY_DIR})
+#get_filename_component(EIGEN3_INCLUDE_DIR "${EIGEN3_INCLUDE_DIR}" REALPATH BASE_DIR "${CMAKE_BINARY_DIR}")
+#message("-- Eigen dir is " ${EIGEN3_INCLUDE_DIR})
+#find_package(Eigen3 REQUIRED)
+#include_directories(${EIGEN3_INCLUDE_DIR})
+#
+#FIND_PACKAGE(Threads REQUIRED)
+#set(LIBS ${LIBS} ${CMAKE_THREAD_LIBS_INIT})
+#
+#configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config.h.cmake ${CMAKE_CURRENT_BINARY_DIR}/config.h)
+#include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 
 
 # look for Boost
-if(DEFINED BOOST_ROOT OR DEFINED BOOSTROOT OR DEFINED ENV{BOOST_ROOT} OR DEFINED ENV{BOOSTROOT})
+#if(DEFINED BOOST_ROOT OR DEFINED BOOSTROOT OR DEFINED ENV{BOOST_ROOT} OR DEFINED ENV{BOOSTROOT})
+#  set(Boost_NO_SYSTEM_PATHS ON)
+#  if(DEFINED ${Boost_INCLUDE_DIR})
+#    get_filename_component(Boost_INCLUDE_DIR "${Boost_INCLUDE_DIR}" REALPATH BASE_DIR "${CMAKE_BINARY_DIR}")
+#  endif()
+#endif()
+#set(Boost_REALPATH ON)
+#find_package(Boost COMPONENTS program_options regex serialization REQUIRED)
+#message("-- Boost dir is " ${Boost_INCLUDE_DIR})
+#include_directories(${Boost_INCLUDE_DIR})
+# look for Boost
+if(DEFINED ENV{BOOST_ROOT})
   set(Boost_NO_SYSTEM_PATHS ON)
-  if(DEFINED ${Boost_INCLUDE_DIR})
-    get_filename_component(Boost_INCLUDE_DIR "${Boost_INCLUDE_DIR}" REALPATH BASE_DIR "${CMAKE_BINARY_DIR}")
-  endif()
 endif()
 set(Boost_REALPATH ON)
-find_package(Boost COMPONENTS program_options regex serialization REQUIRED)
-message("-- Boost dir is " ${Boost_INCLUDE_DIR})
+find_package(Boost COMPONENTS program_options serialization REQUIRED)
 include_directories(${Boost_INCLUDE_DIR})
+set(LIBS ${LIBS} ${Boost_LIBRARIES})
+link_directories( ${Boost_LIBRARY_DIRS})
 
+# look for Eigen
+find_package(Eigen3 REQUIRED)
+include_directories(${EIGEN3_INCLUDE_DIR})
 
 add_subdirectory(dynet/dynet)
 add_subdirectory(parser)
