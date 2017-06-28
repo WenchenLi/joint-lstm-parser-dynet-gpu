@@ -3,7 +3,7 @@
 WORKING_DIR=$1
 mkdir -p $WORKING_DIR
 
-WORD_EMBEDDING=data/word_embedding/wiki.zh.wang2vec_short.100.vec
+WORD_EMBEDDING=data/word_embedding/wiki.zh.wang2vec.100.vec
 
 TRAIN_CONLL_DATA=data/conll2009/CoNLL2009-ST-Chinese/CoNLL2009-ST-Chinese-train.txt
 DEV_CONLL_DATA=data/conll2009/CoNLL2009-ST-Chinese/CoNLL2009-ST-Chinese-development.txt
@@ -25,5 +25,5 @@ rm $TRAIN_CONLL_LEMMA
 TRAIN_CONLL_LEMMA=$WORKING_DIR/train.conll.pb.lemmas
 
 #train
-cmake-build-debug/parser/lstm-parse -T $TRAIN_DATA -d $DEV_DATA -w $WORD_EMBEDDING --propbank_lemmas $TRAIN_CONLL_LEMMA -g $DEV_CONLL_DATA -e eval09.pl -s dev.predictions.conll --out_model $WORKING_DIR/joint.model -t
+cmake-build-debug/parser/lstm-parse --dynet-mem 4096 --dynet-autobatch 1 -T $TRAIN_DATA -d $DEV_DATA -w $WORD_EMBEDDING --propbank_lemmas $TRAIN_CONLL_LEMMA -g $DEV_CONLL_DATA -e eval09.pl -s dev.predictions.conll --out_model $WORKING_DIR/joint.model -t
 #build/parser/lstm-parse

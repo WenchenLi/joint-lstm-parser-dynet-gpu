@@ -498,7 +498,7 @@ struct ParserBuilder {
                 unsigned lemma_id = gold_preds.find(bufferi.back())->second;
                 auto lpmk = corpus.lemma_practs_map.find(lemma_id);
                 if (lpmk == corpus.lemma_practs_map.end()) {
-                    break;
+//                    break;
                     current_valid_actions.push_back(
                             corpus.act_dict.Convert(corpus.PR_UNK));
                 } else {
@@ -559,9 +559,9 @@ struct ParserBuilder {
             if (build_training_graph) { // if we have reference actions (for training) use them
                 chosen_act_id = correct_actions[act_seq_id];
                 // find the index of the correct action in the list of current valid actions.
-                chosen_idx = find(current_valid_actions.begin(),
-                        current_valid_actions.end(), chosen_act_id)
-                        - current_valid_actions.begin();
+                chosen_idx = (unsigned int) (find(current_valid_actions.begin(),
+                                                  current_valid_actions.end(), chosen_act_id)
+                                             - current_valid_actions.begin());
                 if (chosen_idx >= current_valid_actions.size()) {
                     cerr << "correct action "
                             << corpus.act_dict.Convert(chosen_act_id)
@@ -805,14 +805,14 @@ struct ParserBuilder {
 
             prev_act_enum = chosen_act_enum;
         }
-//        assert(stack.size() == 2); // guard symbol, root
-//        assert(stacki.size() == 2);
-//
-//        assert(sem_stack.size() == 2); // guard symbol
-//        assert(sem_stacki.size() == 2);
-//
-//        assert(buffer.size() == 1); // guard symbol
-//        assert(bufferi.size() == 1);
+        assert(stack.size() == 2); // guard symbol, root
+        assert(stacki.size() == 2);
+
+        assert(sem_stack.size() == 2); // guard symbol
+        assert(sem_stacki.size() == 2);
+
+        assert(buffer.size() == 1); // guard symbol
+        assert(bufferi.size() == 1);
 
 
         return partial;
@@ -1100,8 +1100,12 @@ void do_training(Model model, ParserBuilder parser,
     bool soft_link_created = false;
     signal(SIGINT, signal_callback_handler);
 
-    SimpleSGDTrainer sgd(model); // MomentumSGDTrainer sgd(&model);TODO learning rate
-    sgd.eta_decay = 0.08; // 0.05;
+    dynet::real learning_rate = .1;
+    dynet::real decay_rate = .1;
+    SimpleSGDTrainer sgd(model,learning_rate, decay_rate); // MomentumSGDTrainer sgd(&model);TODO learning rate
+
+    sgd.clipping_enabled = true;
+//    sgd.eta_decay = 0.08; // 0.05;
 
     vector<unsigned> order(corpus.num_sents);
     for (unsigned i = 0; i < corpus.num_sents; ++i) {
@@ -1268,11 +1272,11 @@ int main(int argc, char** argv) {
     po::variables_map conf;
     init_command_line(argc, (const char *const *) argv, &conf);
 
-    USE_POS = conf.count("use_pos_tags");
-    USE_SPELLING = conf.count("use_spelling"); //Miguel
+    USE_POS = (bool) conf.count("use_pos_tags");
+    USE_SPELLING = (bool) conf.count("use_spelling"); //Miguel
 
     corpus.USE_SPELLING = USE_SPELLING;
-    corpus.USE_LOWERWV = conf.count("use_lowerwv");
+    corpus.USE_LOWERWV = (bool) conf.count("use_lowerwv");
 
     LAYERS = conf["layers"].as<unsigned>();
     INPUT_DIM = conf["input_dim"].as<unsigned>();
@@ -1302,6 +1306,14 @@ int main(int argc, char** argv) {
         cerr << "Using dropout = " << DROPOUT << endl;
     }
 
+    cout << "training config:" <<  "USE_POS:"<<(USE_POS ? "pos" : "nopos") << '\n'
+                                << "LAYERS:"<<LAYERS << '\n'
+                                << "INPUT_DIM:" <<INPUT_DIM << '\n'
+                                << "HIDDEN_DIM:" <<HIDDEN_DIM << '\n'
+                                << "ACTION_DIM:"<<ACTION_DIM << '\n'
+                                << "LSTM_INPUT_DIM:" << LSTM_INPUT_DIM << '\n'
+                                << "POS_DIM:" << POS_DIM << '\n'
+                                << "REL_DIM:"<<REL_DIM << endl;
     ostringstream os;
     os << "parser_" << (USE_POS ? "pos" : "nopos") << '_' << LAYERS << '_'
             << INPUT_DIM << '_' << HIDDEN_DIM << '_' << ACTION_DIM << '_'
