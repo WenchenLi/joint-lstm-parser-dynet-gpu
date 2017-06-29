@@ -500,7 +500,7 @@ struct ParserBuilder {
                 unsigned lemma_id = gold_preds.find(bufferi.back())->second;
                 auto lpmk = corpus.lemma_practs_map.find(lemma_id);
                 if (lpmk == corpus.lemma_practs_map.end()) {
-//                    break;
+                    break;
                     current_valid_actions.push_back(
                             corpus.act_dict.Convert(corpus.PR_UNK));
                 } else {
@@ -541,7 +541,7 @@ struct ParserBuilder {
             }
 
             Expression prob_dist = log_softmax(pars_act); //, current_valid_actions);
-            vector<float> prob_dist_vec = as_vector(hg->incremental_forward(prob_dist));
+            vector<float> prob_dist_vec = as_vector(hg->forward(prob_dist));
             // so it can be iterated over
             // do the argmax
             double best_score = prob_dist_vec[0]; //[current_valid_actions[0]];
@@ -816,14 +816,14 @@ struct ParserBuilder {
 
             prev_act_enum = chosen_act_enum;
         }
-        assert(stack.size() == 2); // guard symbol, root
-        assert(stacki.size() == 2);
-
-        assert(sem_stack.size() == 2); // guard symbol
-        assert(sem_stacki.size() == 2);
-
-        assert(buffer.size() == 1); // guard symbol
-        assert(bufferi.size() == 1);
+//        assert(stack.size() == 2); // guard symbol, root
+//        assert(stacki.size() == 2);
+//
+//        assert(sem_stack.size() == 2); // guard symbol
+//        assert(sem_stacki.size() == 2);
+//
+//        assert(buffer.size() == 1); // guard symbol
+//        assert(bufferi.size() == 1);
 
         return partial;
     }
@@ -1225,36 +1225,36 @@ void do_training(Model model, ParserBuilder parser,
             const map<int, unsigned>& train_preds =
                     corpus.preds_train[order[si]];
 
-            if (train_preds.size()<1) {
-                cout << "begin" << endl;
-                for (auto x: tsentence) {
-                    string ww = corpus.tok_dict.Convert(x);
-                    cout << ww << endl;
+//            if (train_preds.size()<1) {
+//                cout << "begin" << endl;
+//                for (auto x: tsentence) {
+//                    string ww = corpus.tok_dict.Convert(x);
+//                    cout << ww << endl;
+//
+//                }
+//                for (auto x: train_preds) {
+//                    cout << x.first << " => " << x.second << '\n';
+//                }
+//                cout << "end" << endl;
+//            }else {
+            ComputationGraph hg;
+            JointParse partial;
+            partial = parser.log_prob_parser(&hg, train_sent, tsentence, train_pos,
+                                             train_preds, train_gold_acts, &right);
+            Expression tot_neglogprob = -sum(partial.log_probs);
 
-                }
-                for (auto x: train_preds) {
-                    cout << x.first << " => " << x.second << '\n';
-                }
-                cout << "end" << endl;
-            }else {
-                ComputationGraph hg;
-                JointParse partial;
-                partial = parser.log_prob_parser(&hg, train_sent, tsentence, train_pos,
-                                                 train_preds, train_gold_acts, &right);
-                Expression tot_neglogprob = -sum(partial.log_probs);
-
-                double lp = as_scalar(hg.incremental_forward(tot_neglogprob));
-                if (lp < 0) {
-                    cerr << "Log prob < 0 on sentence " << order[si] << ": lp="
-                         << lp << endl;
-                    assert(lp >= 0.0);
-                }
-                hg.backward(tot_neglogprob);
-                sgd.update(1.0);
-                llh += lp;
-//                ++si;
-                trs += train_gold_acts.size();
+            double lp = as_scalar(hg.forward(tot_neglogprob));//incremental_forward
+            if (lp < 0) {
+                cerr << "Log prob < 0 on sentence " << order[si] << ": lp="
+                     << lp << endl;
+                assert(lp >= 0.0);
             }
+            hg.backward(tot_neglogprob);
+            sgd.update(1.0);
+            llh += lp;
+//                ++si;
+            trs += train_gold_acts.size();
+//            }
             ++si;
         }
         sgd.status();
