@@ -32,14 +32,14 @@ cpyp::Corpus corpus;
 
 volatile bool requested_stop = false;
 unsigned LAYERS = 2;
-unsigned INPUT_DIM = 40;
-unsigned HIDDEN_DIM = 60;
-unsigned ACTION_DIM = 36;
-unsigned PRETRAINED_DIM = 50;
-unsigned LSTM_INPUT_DIM = 60;
-unsigned POS_DIM = 10;
-unsigned REL_DIM = 8;
-unsigned PRED_DIM = 30;
+unsigned INPUT_DIM = 32;
+unsigned HIDDEN_DIM = 100;
+unsigned ACTION_DIM = 100;
+unsigned PRETRAINED_DIM = 100;
+unsigned LSTM_INPUT_DIM = 100;
+unsigned POS_DIM = 12;
+unsigned REL_DIM = 20;
+unsigned PRED_DIM = 100;
 
 unsigned LSTM_CHAR_OUTPUT_DIM = 100; //Miguel
 bool USE_SPELLING = false;
@@ -288,8 +288,10 @@ struct ParserBuilder {
             const map<int, unsigned>& gold_preds,
             const vector<unsigned>& correct_actions, double *right) {
 
+
         vector<unsigned> results;
         const bool build_training_graph = correct_actions.size() > 0;
+
 
         if (USE_DROPOUT && build_training_graph) {
             stack_lstm.set_dropout(DROPOUT);
@@ -429,7 +431,7 @@ struct ParserBuilder {
                 }
             } else { //NO SPELLING
                 //Don't use SPELLING
-                //cout<<"don't use spelling"<<"\n";
+//                cout<<"don't use spelling"<<"\n";
                 w = lookup(*hg, p_tok, sent[i]);
             }
 
@@ -563,6 +565,15 @@ struct ParserBuilder {
                                                   current_valid_actions.end(), chosen_act_id)
                                              - current_valid_actions.begin());
                 if (chosen_idx >= current_valid_actions.size()) {
+
+                    //debug for sentence leads to this training error
+                    for (unsigned i = 1; i < sent.size(); ++i) {
+                        unsigned wi = sent[i];
+                        string ww = corpus.tok_dict.Convert(wi);
+                        cout << " sent:" << wi<< " raw sent:" << raw_sent[i] <<" ww:"<<ww<< endl;
+
+                    }
+
                     cerr << "correct action "
                             << corpus.act_dict.Convert(chosen_act_id)
                             << " not in the list of Valid Actions:" << endl;
@@ -813,7 +824,6 @@ struct ParserBuilder {
 
         assert(buffer.size() == 1); // guard symbol
         assert(bufferi.size() == 1);
-
 
         return partial;
     }
@@ -1097,7 +1107,7 @@ void do_training(Model model, ParserBuilder parser,
         string param_fname, po::variables_map conf) {
 
     double best_macrof1 = 0.0;
-    bool soft_link_created = false;
+//    bool soft_link_created = false;
     signal(SIGINT, signal_callback_handler);
 
     dynet::real learning_rate = .1;
@@ -1114,7 +1124,7 @@ void do_training(Model model, ParserBuilder parser,
 
     double tot_seen = 0;
     unsigned si = corpus.num_sents;
-    unsigned status_every_i_iterations = 100;
+    unsigned status_every_i_iterations = 100;//this one can be the batch size
     status_every_i_iterations = min(status_every_i_iterations,
             corpus.num_sents);
 
@@ -1130,6 +1140,66 @@ void do_training(Model model, ParserBuilder parser,
         for (unsigned tr_idx = 0; tr_idx < status_every_i_iterations;
                 ++tr_idx) {
             if (si == corpus.num_sents) {
+                { // report on dev set
+
+                    unsigned dev_size = corpus.num_sents_dev;
+                    double llh = 0;
+                    double trs = 0;
+                    double right = 0;
+
+                    auto t_start = std::chrono::high_resolution_clock::now();
+
+                    bool is_first = true;
+                    for (unsigned idx = 0; idx < dev_size; ++idx) {
+                        const vector<unsigned>& dev_sent = corpus.tokens_dev[idx];
+                        const vector<unsigned>& dev_pos = corpus.pos_dev[idx];
+                        const vector<string>& oov_toks_dev = corpus.oov_tokens_dev[idx];
+                        const map<int, unsigned>& dev_preds = corpus.preds_dev[idx];
+                        const map<int, string>& oov_preds_dev =
+                                corpus.oov_preds_dev[idx];
+
+                        vector<unsigned> dev_sent_unk = dev_sent; // TODO(Miguel): what's this?
+                        if (!USE_SPELLING) {
+                            for (auto& w : dev_sent_unk) {
+                                if (training_vocab.count(w) == 0) {
+                                    w = kUNK;
+                                }
+                            }
+                        }
+
+                        ComputationGraph hg;
+                        JointParse predicted = parser.log_prob_parser(&hg, dev_sent,
+                                                                      dev_sent_unk, dev_pos, dev_preds, vector<unsigned>(),
+                                                                      &right);
+                        double lp = 0;
+                        llh -= lp;
+                        trs += corpus.correct_act_dev[idx].size();
+
+                        print_joint_conll(dev_sent, dev_pos, oov_toks_dev,
+                                          oov_preds_dev, predicted, output_conll, is_first);
+                        is_first = false;
+                    }
+
+                    double las = 0, semf1 = 0, macrof1 = 0;
+                    run_eval_script(conf, &las, &semf1, &macrof1);
+
+                    auto t_end = std::chrono::high_resolution_clock::now();
+                    cerr << "  **dev (iter=" << iter << " epoch="
+                         << (tot_seen / corpus.num_sents) << ")\t" << " llh=" << llh
+                         << " ppl: " << exp(llh / trs) << " err: "
+                         << (trs - right) / trs << " las: " << las << " semF1: "
+                         << semf1 << " macro:" << macrof1 << "\t[" << dev_size
+                         << " sents in "
+                         << std::chrono::duration<double, std::milli>(
+                                 t_end - t_start).count() << " ms]" << endl;
+
+                    if (macrof1 > best_macrof1) {
+                        best_macrof1 = macrof1;
+                        ofstream out(param_fname);
+                        boost::archive::text_oarchive oa(out);
+                        oa << model;
+                    }
+                }
                 si = 0;
                 if (first) {
                     first = false;
@@ -1154,23 +1224,38 @@ void do_training(Model model, ParserBuilder parser,
                     corpus.correct_act_train[order[si]];
             const map<int, unsigned>& train_preds =
                     corpus.preds_train[order[si]];
-            ComputationGraph hg;
-            JointParse partial;
-            partial = parser.log_prob_parser(&hg, train_sent, tsentence, train_pos,
-                    train_preds, train_gold_acts, &right);
-            Expression tot_neglogprob = -sum(partial.log_probs);
 
-            double lp = as_scalar(hg.incremental_forward(tot_neglogprob));
-            if (lp < 0) {
-                cerr << "Log prob < 0 on sentence " << order[si] << ": lp="
-                        << lp << endl;
-                assert(lp >= 0.0);
+            if (train_preds.size()<1) {
+                cout << "begin" << endl;
+                for (auto x: tsentence) {
+                    string ww = corpus.tok_dict.Convert(x);
+                    cout << ww << endl;
+
+                }
+                for (auto x: train_preds) {
+                    cout << x.first << " => " << x.second << '\n';
+                }
+                cout << "end" << endl;
+            }else {
+                ComputationGraph hg;
+                JointParse partial;
+                partial = parser.log_prob_parser(&hg, train_sent, tsentence, train_pos,
+                                                 train_preds, train_gold_acts, &right);
+                Expression tot_neglogprob = -sum(partial.log_probs);
+
+                double lp = as_scalar(hg.incremental_forward(tot_neglogprob));
+                if (lp < 0) {
+                    cerr << "Log prob < 0 on sentence " << order[si] << ": lp="
+                         << lp << endl;
+                    assert(lp >= 0.0);
+                }
+                hg.backward(tot_neglogprob);
+                sgd.update(1.0);
+                llh += lp;
+//                ++si;
+                trs += train_gold_acts.size();
             }
-            hg.backward(tot_neglogprob);
-            sgd.update(1.0);
-            llh += lp;
             ++si;
-            trs += train_gold_acts.size();
         }
         sgd.status();
         cerr << "update #" << iter << " (epoch "
@@ -1182,82 +1267,82 @@ void do_training(Model model, ParserBuilder parser,
         static int logc = 0;
         ++logc;
 
-        if (logc % 25 == 1) { // report on dev set
-
-            unsigned dev_size = corpus.num_sents_dev;
-            double llh = 0;
-            double trs = 0;
-            double right = 0;
-
-            auto t_start = std::chrono::high_resolution_clock::now();
-
-            bool is_first = true;
-            for (unsigned idx = 0; idx < dev_size; ++idx) {
-                const vector<unsigned>& dev_sent = corpus.tokens_dev[idx];
-                const vector<unsigned>& dev_pos = corpus.pos_dev[idx];
-                const vector<string>& oov_toks_dev = corpus.oov_tokens_dev[idx];
-                const map<int, unsigned>& dev_preds = corpus.preds_dev[idx];
-                const map<int, string>& oov_preds_dev =
-                        corpus.oov_preds_dev[idx];
-
-                vector<unsigned> dev_sent_unk = dev_sent; // TODO(Miguel): what's this?
-                if (!USE_SPELLING) {
-                    for (auto& w : dev_sent_unk) {
-                        if (training_vocab.count(w) == 0) {
-                            w = kUNK;
-                        }
-                    }
-                }
-
-                ComputationGraph hg;
-                JointParse predicted = parser.log_prob_parser(&hg, dev_sent,
-                        dev_sent_unk, dev_pos, dev_preds, vector<unsigned>(),
-                        &right);
-                double lp = 0;
-                llh -= lp;
-                trs += corpus.correct_act_dev[idx].size();
-
-                print_joint_conll(dev_sent, dev_pos, oov_toks_dev,
-                        oov_preds_dev, predicted, output_conll, is_first);
-                is_first = false;
-            }
-
-            double las = 0, semf1 = 0, macrof1 = 0;
-            run_eval_script(conf, &las, &semf1, &macrof1);
-
-            auto t_end = std::chrono::high_resolution_clock::now();
-            cerr << "  **dev (iter=" << iter << " epoch="
-                    << (tot_seen / corpus.num_sents) << ")\t" << " llh=" << llh
-                    << " ppl: " << exp(llh / trs) << " err: "
-                    << (trs - right) / trs << " las: " << las << " semF1: "
-                    << semf1 << " macro:" << macrof1 << "\t[" << dev_size
-                    << " sents in "
-                    << std::chrono::duration<double, std::milli>(
-                            t_end - t_start).count() << " ms]" << endl;
-
-            if (macrof1 > best_macrof1) {
-                best_macrof1 = macrof1;
-                ofstream out(param_fname);
-                boost::archive::text_oarchive oa(out);
-                oa << model;
-                // Create a soft link to the most recent model in order to make it
-                // easier to refer to it in a shell script.
-                if (soft_link_created == false) {
-                    string softlink = " latest_model";
-                    if (conf.count("out_model")) { // if output model file is specified
-                        softlink = " " + conf["out_model"].as<string>();
-                    }
-                    if (system((string("rm -f ") + softlink).c_str()) == 0
-                            && system(
-                                    (string("ln -s ") + param_fname + softlink).c_str())
-                                    == 0) {
-                        cerr << "Created " << softlink << " as a soft link to "
-                                << param_fname << " for convenience." << endl;
-                    }
-                    soft_link_created = true;
-                }
-            }
-        }
+//        if (logc % 25 == 1) { // report on dev set
+//
+//            unsigned dev_size = corpus.num_sents_dev;
+//            double llh = 0;
+//            double trs = 0;
+//            double right = 0;
+//
+//            auto t_start = std::chrono::high_resolution_clock::now();
+//
+//            bool is_first = true;
+//            for (unsigned idx = 0; idx < dev_size; ++idx) {
+//                const vector<unsigned>& dev_sent = corpus.tokens_dev[idx];
+//                const vector<unsigned>& dev_pos = corpus.pos_dev[idx];
+//                const vector<string>& oov_toks_dev = corpus.oov_tokens_dev[idx];
+//                const map<int, unsigned>& dev_preds = corpus.preds_dev[idx];
+//                const map<int, string>& oov_preds_dev =
+//                        corpus.oov_preds_dev[idx];
+//
+//                vector<unsigned> dev_sent_unk = dev_sent; // TODO(Miguel): what's this?
+//                if (!USE_SPELLING) {
+//                    for (auto& w : dev_sent_unk) {
+//                        if (training_vocab.count(w) == 0) {
+//                            w = kUNK;
+//                        }
+//                    }
+//                }
+//
+//                ComputationGraph hg;
+//                JointParse predicted = parser.log_prob_parser(&hg, dev_sent,
+//                        dev_sent_unk, dev_pos, dev_preds, vector<unsigned>(),
+//                        &right);
+//                double lp = 0;
+//                llh -= lp;
+//                trs += corpus.correct_act_dev[idx].size();
+//
+//                print_joint_conll(dev_sent, dev_pos, oov_toks_dev,
+//                        oov_preds_dev, predicted, output_conll, is_first);
+//                is_first = false;
+//            }
+//
+//            double las = 0, semf1 = 0, macrof1 = 0;
+//            run_eval_script(conf, &las, &semf1, &macrof1);
+//
+//            auto t_end = std::chrono::high_resolution_clock::now();
+//            cerr << "  **dev (iter=" << iter << " epoch="
+//                    << (tot_seen / corpus.num_sents) << ")\t" << " llh=" << llh
+//                    << " ppl: " << exp(llh / trs) << " err: "
+//                    << (trs - right) / trs << " las: " << las << " semF1: "
+//                    << semf1 << " macro:" << macrof1 << "\t[" << dev_size
+//                    << " sents in "
+//                    << std::chrono::duration<double, std::milli>(
+//                            t_end - t_start).count() << " ms]" << endl;
+//
+//            if (macrof1 > best_macrof1) {
+//                best_macrof1 = macrof1;
+//                ofstream out(param_fname);
+//                boost::archive::text_oarchive oa(out);
+//                oa << model;
+//                // Create a soft link to the most recent model in order to make it
+//                // easier to refer to it in a shell script.
+//                if (soft_link_created == false) {
+//                    string softlink = " latest_model";
+//                    if (conf.count("out_model")) { // if output model file is specified
+//                        softlink = " " + conf["out_model"].as<string>();
+//                    }
+//                    if (system((string("rm -f ") + softlink).c_str()) == 0
+//                            && system(
+//                                    (string("ln -s ") + param_fname + softlink).c_str())
+//                                    == 0) {
+//                        cerr << "Created " << softlink << " as a soft link to "
+//                                << param_fname << " for convenience." << endl;
+//                    }
+//                    soft_link_created = true;
+//                }
+//            }
+//        }
     }
 }
 
@@ -1366,7 +1451,7 @@ int main(int argc, char** argv) {
 
     // Computing the singletons in the parser's training data for OOV replacement
     set<unsigned> training_vocab; // words available in the training corpus
-    set<unsigned> singletons;
+    set<unsigned> singletons; // word appears once
     {
         map<unsigned, unsigned> counts;
         for (auto sent : corpus.tokens_train) {
