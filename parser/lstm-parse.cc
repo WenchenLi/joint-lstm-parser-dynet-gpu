@@ -354,8 +354,8 @@ struct ParserBuilder {
         vector < Expression > buffer(sent.size() + 1);
         vector<int> bufferi(sent.size() + 1); // position of the words in the sentence
 
-        Expression word_end = parameter(*hg, p_end_of_word); //Miguel
-        Expression word_start = parameter(*hg, p_start_of_word); //Miguel
+//        Expression word_end = parameter(*hg, p_end_of_word); //Miguel
+//        Expression word_start = parameter(*hg, p_start_of_word); //Miguel
 
         if (USE_SPELLING) {
             fw_char_lstm.new_graph(*hg);
@@ -363,77 +363,11 @@ struct ParserBuilder {
         }
 
         for (unsigned i = 0; i < sent.size(); ++i) {
-            //assert(sent[i] < VOCAB_SIZE);
-            //Expression w = lookup(*hg, p_tok, sent[i]);
-
             unsigned wi = sent[i];
             string ww = corpus.tok_dict.Convert(wi);
 
             Expression w;
-            /**********SPELLING MODEL*****************/
-            if (USE_SPELLING) {
-                //cout<<"using spelling"<<"\n";
-                if (ww.length() == 4 && ww[0] == 'R' && ww[1] == 'O'
-                        && ww[2] == 'O' && ww[3] == 'T') {
-                    w = lookup(*hg, p_tok, sent[i]); //we do not need a LSTM encoding for the root word, so we put it directly-.
-                } else {
-                    fw_char_lstm.start_new_sequence();
-                    //cerr<<"start_new_sequence done"<<"\n";
-
-                    fw_char_lstm.add_input(word_start);
-                    //cerr<<"added start of word symbol"<<"\n";
-                    vector<int> strevbuffer;
-                    for (unsigned j = 0; j < ww.length();
-                            j += get_UTF8_len(ww[j])) {
-                        //cerr<<j<<":"<<w[j]<<"\n";
-                        string wj;
-                        for (unsigned h = j; h < j + get_UTF8_len(ww[j]); h++) {
-                            wj += ww[h];
-                        }
-                        //cout<<"fw"<<wj<<"\n";
-                        int wjint = corpus.chars_int_map[wj];
-                        //cout<<"fw:"<<wjint<<"\n";
-                        strevbuffer.push_back(wjint);
-                        Expression cj = lookup(*hg, char_emb, wjint);
-                        fw_char_lstm.add_input(cj);
-                        //cout<<"Inputdim:"<<LSTM_INPUT_DIM<<"\n";
-                        //hg->incremental_forward();
-                    }
-
-                    fw_char_lstm.add_input(word_end);
-                    //cerr<<"added end of word symbol"<<"\n";
-                    Expression fw_i = fw_char_lstm.back();
-                    //cerr<<"fw_char_lstm.back() done"<<"\n";
-
-                    bw_char_lstm.start_new_sequence();
-                    //cerr<<"bw start new sequence done"<<"\n";
-
-                    bw_char_lstm.add_input(word_end);
-                    //for (unsigned j=w.length()-1;j>=0;j--){
-                    /*for (unsigned j=w.length();j-->0;){
-                     //cerr<<j<<":"<<w[j]<<"\n";
-                     Expression cj=lookup(*hg, char_emb, w[j]);
-                     bw_char_lstm.add_input(cj);
-                     }*/
-
-                    while (!strevbuffer.empty()) {
-                        int wjint = strevbuffer.back();
-                        //cout<<"bw:"<<wjint<<"\n";
-                        Expression cj = lookup(*hg, char_emb, wjint);
-                        bw_char_lstm.add_input(cj);
-                        strevbuffer.pop_back();
-                    }
-
-                    bw_char_lstm.add_input(word_start);
-                    Expression bw_i = bw_char_lstm.back();
-                    vector<Expression> tt = {fw_i, bw_i};
-                    w = concatenate(tt); //and this goes into the buffer...
-                }
-            } else { //NO SPELLING
-                //Don't use SPELLING
-//                cout<<"don't use spelling"<<"\n";
-                w = lookup(*hg, p_tok, sent[i]);
-            }
+            w = lookup(*hg, p_tok, sent[i]);
 
             Expression i_i;
             if (USE_POS) {
@@ -500,7 +434,7 @@ struct ParserBuilder {
                 unsigned lemma_id = gold_preds.find(bufferi.back())->second;
                 auto lpmk = corpus.lemma_practs_map.find(lemma_id);
                 if (lpmk == corpus.lemma_practs_map.end()) {
-                    break;
+//                    break;
                     current_valid_actions.push_back(
                             corpus.act_dict.Convert(corpus.PR_UNK));
                 } else {
@@ -541,7 +475,7 @@ struct ParserBuilder {
             }
 
             Expression prob_dist = log_softmax(pars_act); //, current_valid_actions);
-            vector<float> prob_dist_vec = as_vector(hg->forward(prob_dist));
+            vector<float> prob_dist_vec = as_vector(hg->incremental_forward(prob_dist));
             // so it can be iterated over
             // do the argmax
             double best_score = prob_dist_vec[0]; //[current_valid_actions[0]];
@@ -594,7 +528,6 @@ struct ParserBuilder {
             }
 
             ++act_seq_id;
-            //log_probs.push_back(pick(prob_dist, chosen_act_id));
             partial.log_probs.push_back(pick(prob_dist, chosen_idx));
             results.push_back(chosen_act_id);
 
@@ -816,14 +749,14 @@ struct ParserBuilder {
 
             prev_act_enum = chosen_act_enum;
         }
-//        assert(stack.size() == 2); // guard symbol, root
-//        assert(stacki.size() == 2);
-//
-//        assert(sem_stack.size() == 2); // guard symbol
-//        assert(sem_stacki.size() == 2);
-//
-//        assert(buffer.size() == 1); // guard symbol
-//        assert(bufferi.size() == 1);
+        assert(stack.size() == 2); // guard symbol, root
+        assert(stacki.size() == 2);
+
+        assert(sem_stack.size() == 2); // guard symbol
+        assert(sem_stacki.size() == 2);
+
+        assert(buffer.size() == 1); // guard symbol
+        assert(bufferi.size() == 1);
 
         return partial;
     }
@@ -1106,7 +1039,7 @@ void do_training(Model model, ParserBuilder parser,
         set<unsigned> training_vocab, set<unsigned> singletons,
         string param_fname, po::variables_map conf) {
 
-    double best_macrof1 = 0.0;
+//    double best_macrof1 = 0.0;
 //    bool soft_link_created = false;
     signal(SIGINT, signal_callback_handler);
 
@@ -1134,128 +1067,86 @@ void do_training(Model model, ParserBuilder parser,
     bool first = true;
     int iter = -1;
 
+    size_t  BATCH_SIZE =  1;
+    vector<Expression> batch(BATCH_SIZE);
+
+
     while (!requested_stop) {
         ++iter;
 
         for (unsigned tr_idx = 0; tr_idx < status_every_i_iterations;
                 ++tr_idx) {
+            // update epoch
             if (si == corpus.num_sents) {
-                { // report on dev set
-
-                    unsigned dev_size = corpus.num_sents_dev;
-                    double llh = 0;
-                    double trs = 0;
-                    double right = 0;
-
-                    auto t_start = std::chrono::high_resolution_clock::now();
-
-                    bool is_first = true;
-                    for (unsigned idx = 0; idx < dev_size; ++idx) {
-                        const vector<unsigned>& dev_sent = corpus.tokens_dev[idx];
-                        const vector<unsigned>& dev_pos = corpus.pos_dev[idx];
-                        const vector<string>& oov_toks_dev = corpus.oov_tokens_dev[idx];
-                        const map<int, unsigned>& dev_preds = corpus.preds_dev[idx];
-                        const map<int, string>& oov_preds_dev =
-                                corpus.oov_preds_dev[idx];
-
-                        vector<unsigned> dev_sent_unk = dev_sent; // TODO(Miguel): what's this?
-                        if (!USE_SPELLING) {
-                            for (auto& w : dev_sent_unk) {
-                                if (training_vocab.count(w) == 0) {
-                                    w = kUNK;
-                                }
-                            }
-                        }
-
-                        ComputationGraph hg;
-                        JointParse predicted = parser.log_prob_parser(&hg, dev_sent,
-                                                                      dev_sent_unk, dev_pos, dev_preds, vector<unsigned>(),
-                                                                      &right);
-                        double lp = 0;
-                        llh -= lp;
-                        trs += corpus.correct_act_dev[idx].size();
-
-                        print_joint_conll(dev_sent, dev_pos, oov_toks_dev,
-                                          oov_preds_dev, predicted, output_conll, is_first);
-                        is_first = false;
-                    }
-
-                    double las = 0, semf1 = 0, macrof1 = 0;
-                    run_eval_script(conf, &las, &semf1, &macrof1);
-
-                    auto t_end = std::chrono::high_resolution_clock::now();
-                    cerr << "  **dev (iter=" << iter << " epoch="
-                         << (tot_seen / corpus.num_sents) << ")\t" << " llh=" << llh
-                         << " ppl: " << exp(llh / trs) << " err: "
-                         << (trs - right) / trs << " las: " << las << " semF1: "
-                         << semf1 << " macro:" << macrof1 << "\t[" << dev_size
-                         << " sents in "
-                         << std::chrono::duration<double, std::milli>(
-                                 t_end - t_start).count() << " ms]" << endl;
-
-                    if (macrof1 > best_macrof1) {
-                        best_macrof1 = macrof1;
-                        ofstream out(param_fname);
-                        boost::archive::text_oarchive oa(out);
-                        oa << model;
-                    }
-                }
                 si = 0;
                 if (first) {
                     first = false;
                 } else {
-                    sgd.update_epoch();
+                    sgd.update_epoch();//update learning rate with decay
                 }
                 cerr << "**SHUFFLE\n";
                 random_shuffle(order.begin(), order.end());
             }
-            tot_seen += 1;
-            const vector<unsigned>& train_sent = corpus.tokens_train[order[si]];
-            vector<unsigned> tsentence = train_sent;
-            if (UNK_STRATEGY == 1) {
-                for (auto& w : tsentence) {
-                    if (singletons.count(w) && dynet::rand01() < UNK_PROB) {
-                        w = kUNK;
+
+            ComputationGraph hg;
+            Expression s;
+            // batch
+            do {
+                tot_seen += 1;
+                cout<<"total seen"<<tot_seen<<endl;
+                const vector<unsigned>& train_sent = corpus.tokens_train[order[si]];
+                vector<unsigned> tsentence = train_sent;
+                if (UNK_STRATEGY == 1) {
+                    for (auto& w : tsentence) {
+                        if (singletons.count(w) && dynet::rand01() < UNK_PROB) {
+                            w = kUNK;
+                        }
                     }
                 }
-            }
-            const vector<unsigned>& train_pos = corpus.pos_train[order[si]];
-            const vector<unsigned>& train_gold_acts =
-                    corpus.correct_act_train[order[si]];
-            const map<int, unsigned>& train_preds =
-                    corpus.preds_train[order[si]];
+                const vector<unsigned>& train_pos = corpus.pos_train[order[si]];
+                const vector<unsigned>& train_gold_acts =
+                        corpus.correct_act_train[order[si]];
+                const map<int, unsigned>& train_preds =
+                        corpus.preds_train[order[si]];
 
-//            if (train_preds.size()<1) {
-//                cout << "begin" << endl;
-//                for (auto x: tsentence) {
-//                    string ww = corpus.tok_dict.Convert(x);
-//                    cout << ww << endl;
-//
-//                }
-//                for (auto x: train_preds) {
-//                    cout << x.first << " => " << x.second << '\n';
-//                }
-//                cout << "end" << endl;
-//            }else {
-            ComputationGraph hg;
-            JointParse partial;
-            partial = parser.log_prob_parser(&hg, train_sent, tsentence, train_pos,
-                                             train_preds, train_gold_acts, &right);
-            Expression tot_neglogprob = -sum(partial.log_probs);
+                bool skip_sentence = true;
+                for (unsigned i = 1; i < train_gold_acts.size(); ++i) {
+                    unsigned wi = train_gold_acts[i];
+                    string ww = corpus.act_dict.Convert(wi);
+//                    cout <<"gold act:"<<ww<< endl;
+//                    cout << ww.substr(0,2)<<endl;
+                    if (ww.substr(0,2)=="PR") skip_sentence=false;
+                }
+                if (skip_sentence){
+                    tr_idx--;
+                }else {
+                    JointParse partial;
+                    partial = parser.log_prob_parser(&hg, train_sent, tsentence, train_pos,
+                                                     train_preds, train_gold_acts, &right);
+                    batch[tr_idx % BATCH_SIZE] = -sum(partial.log_probs);
 
-            double lp = as_scalar(hg.forward(tot_neglogprob));//incremental_forward
-            if (lp < 0) {
-                cerr << "Log prob < 0 on sentence " << order[si] << ": lp="
-                     << lp << endl;
-                assert(lp >= 0.0);
-            }
-            hg.backward(tot_neglogprob);
+
+                    {
+                        cout << batch[tr_idx % BATCH_SIZE].dim() << endl;
+                        for (unsigned l = 1; train_sent.size() > l; ++l) {
+                            unsigned wi = train_sent[l];
+                            string ww = corpus.tok_dict.Convert(wi);
+                            cout <<ww<< endl;
+                        }
+                    }
+
+                    trs += train_gold_acts.size();
+                }
+                ++si;
+                cout<<"total seen"<<tot_seen<<endl;
+
+            } while (++tr_idx % BATCH_SIZE != 0);
+            cout<<"done batch"<<endl;
+            s = sum(batch);
+            double lp = as_scalar(hg.incremental_forward(s));
+            hg.backward(s);
             sgd.update(1.0);
             llh += lp;
-//                ++si;
-            trs += train_gold_acts.size();
-//            }
-            ++si;
         }
         sgd.status();
         cerr << "update #" << iter << " (epoch "
@@ -1374,6 +1265,7 @@ int main(int argc, char** argv) {
     PRED_DIM = conf["pred_dim"].as<unsigned>();
 
     BEAM_SIZE = conf["beam_size"].as<unsigned>();
+//    BATCH_SIZE = conf["beam_size"].as<unsigned>();
 
     UNK_STRATEGY = conf["unk_strategy"].as<unsigned>();
     if (UNK_STRATEGY != 1) {
@@ -1398,7 +1290,8 @@ int main(int argc, char** argv) {
                                 << "ACTION_DIM:"<<ACTION_DIM << '\n'
                                 << "LSTM_INPUT_DIM:" << LSTM_INPUT_DIM << '\n'
                                 << "POS_DIM:" << POS_DIM << '\n'
-                                << "REL_DIM:"<<REL_DIM << endl;
+                                << "REL_DIM:"<<REL_DIM <<'\n'
+                                << "BATCH_SIZE"<<8<<endl;
     ostringstream os;
     os << "parser_" << (USE_POS ? "pos" : "nopos") << '_' << LAYERS << '_'
             << INPUT_DIM << '_' << HIDDEN_DIM << '_' << ACTION_DIM << '_'
