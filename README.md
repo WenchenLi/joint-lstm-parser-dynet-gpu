@@ -63,6 +63,19 @@ If you make use of this software, please cite the following:
 
 For questions and usage issues, please contact swabha@cs.cmu.edu
 
+
+
+## current results
+current result with wang2vec trained with wiki dump 
+
+```
+ **dev (iter=9900 epoch=44.4449)	 llh=0 ppl: 1 err: 1 las: 79.33 semF1: 78.89 macro:79.12	[1762 sents in 48764.3 ms]
+[epoch=44 eta=0.0221239 clips=78 updates=100] update #9901 (epoch 44.4494)	 llh: 4479.1 ppl: 1.47692 err: 0.0833188
+[epoch=44 eta=0.0221239 clips=81 updates=100] update #9902 (epoch 44.4539)	 llh: 4595.28 ppl: 1.49194 err: 0.0837541
+[epoch=44 eta=0.0221239 clips=88 updates=100] update #9903 (epoch 44.4584)	 llh: 5370.55 ppl: 1.5307 err: 0.093698
+[epoch=44 eta=0.0221239 clips=78 updates=100] update #9904 (epoch 44.4629)	 llh: 5197.99 ppl: 1.51209 err: 0.0
+```
+
 ##
 todo :
 1. training got error to fix 
