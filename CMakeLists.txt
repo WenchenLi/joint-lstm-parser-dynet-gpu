@@ -9,6 +9,7 @@ enable_testing()
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/dynet)
 set(WITH_CUDA_BACKEND 1)
 
+
 function(find_cudnn)
   set(CUDNN_ROOT /usr/local/cuda CACHE PATH "CUDNN root path")
   find_path(CUDNN_INCLUDE_DIRS cudnn.h
