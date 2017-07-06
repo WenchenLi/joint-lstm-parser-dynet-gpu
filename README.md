@@ -66,14 +66,21 @@ For questions and usage issues, please contact swabha@cs.cmu.edu
 
 
 ## current results
-current result with wang2vec trained with wiki dump 
+current result with wang2vec trained with wiki dump, use mkl on single thread.
 
 ```
- **dev (iter=9900 epoch=44.4449)	 llh=0 ppl: 1 err: 1 las: 79.33 semF1: 78.89 macro:79.12	[1762 sents in 48764.3 ms]
-[epoch=44 eta=0.0221239 clips=78 updates=100] update #9901 (epoch 44.4494)	 llh: 4479.1 ppl: 1.47692 err: 0.0833188
-[epoch=44 eta=0.0221239 clips=81 updates=100] update #9902 (epoch 44.4539)	 llh: 4595.28 ppl: 1.49194 err: 0.0837541
-[epoch=44 eta=0.0221239 clips=88 updates=100] update #9903 (epoch 44.4584)	 llh: 5370.55 ppl: 1.5307 err: 0.093698
-[epoch=44 eta=0.0221239 clips=78 updates=100] update #9904 (epoch 44.4629)	 llh: 5197.99 ppl: 1.51209 err: 0.0
+08105
+[epoch=69 eta=0.0153374 clips=85 updates=100] update #15394 (epoch 69.1072)	 llh: 4980.81 ppl: 1.51411 err: 0.0898642
+[epoch=69 eta=0.0153374 clips=85 updates=100] update #15395 (epoch 69.1116)	 llh: 4838.37 ppl: 1.49128 err: 0.0852399
+[epoch=69 eta=0.0153374 clips=75 updates=100] update #15396 (epoch 69.1161)	 llh: 4759.13 ppl: 1.4869 err: 0.0904393
+[epoch=69 eta=0.0153374 clips=84 updates=100] update #15397 (epoch 69.1206)	 llh: 5141.25 ppl: 1.47943 err: 0.0887484
+[epoch=69 eta=0.0153374 clips=89 updates=100] update #15398 (epoch 69.1251)	 llh: 5748.75 ppl: 1.52395 err: 0.0948333
+[epoch=69 eta=0.0153374 clips=85 updates=100] update #15399 (epoch 69.1296)	 llh: 4799.43 ppl: 1.49627 err: 0.0897565
+[epoch=69 eta=0.0153374 clips=81 updates=100] update #15400 (epoch 69.1341)	 llh: 5530.8 ppl: 1.52136 err: 0.0899021
+  **dev (iter=15400 epoch=69.1341)	 llh=0 ppl: 1 err: 1 las: 79.01 semF1: 79.04 macro:79.04	[1762 sents in 39816.8 ms]
+
+
+
 ```
 
 ##
