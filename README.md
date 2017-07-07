@@ -101,6 +101,6 @@ will helps a lot since computing related to other non matrix operations.[give mo
 3. predict
 
 3.1 predicate identification
-    https://github.com/clab/lstm-parser
+    https://github.com/clab/lstm-parser, 
     
 3.2 predict role labels
