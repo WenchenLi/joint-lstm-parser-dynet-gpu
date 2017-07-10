@@ -338,7 +338,7 @@ struct ParserBuilder {
         Expression pos2l;
         if (USE_POS)
             pos2l = parameter(*hg, p_pos2l);
-        Expression emb2l;
+        Expression emb2l;//embedding to layers/lstm
         if (&p_emb2l)
             emb2l = parameter(*hg, p_emb2l);
         Expression inp_bias = parameter(*hg, p_inp_bias);
@@ -1101,119 +1101,6 @@ void do_test_eval(const unsigned beam_size, ParserBuilder parser,
             << " ms]" << endl;
 }
 
-//void do_training(Model model, ParserBuilder parser,
-//        set<unsigned> training_vocab, set<unsigned> singletons,
-//        string param_fname, po::variables_map conf) {
-//
-//    double best_macrof1 = 0.0;
-//    bool soft_link_created = false;
-//    signal(SIGINT, signal_callback_handler);
-//
-//    SimpleSGDTrainer sgd(model); // MomentumSGDTrainer sgd(&model);TODO learning rate
-//    sgd.eta_decay = 0.08; // 0.05;
-//
-//    vector<unsigned> order(corpus.num_sents);
-//    for (unsigned i = 0; i < corpus.num_sents; ++i) {
-//        order[i] = i;
-//    }
-//
-//    double tot_seen = 0;
-//    unsigned si = corpus.num_sents;
-//    unsigned status_every_i_iterations = 100;
-//    status_every_i_iterations = min(status_every_i_iterations,
-//            corpus.num_sents);
-//
-//    unsigned trs = 0;
-//    double right = 0;
-//    double llh = 0;
-//    bool first = true;
-//    int iter = -1;
-//
-//    while (!requested_stop) {
-//        ++iter;
-//
-//        for (unsigned tr_idx = 0; tr_idx < status_every_i_iterations;
-//                ++tr_idx) {
-//            if (si == corpus.num_sents) {
-//                si = 0;
-//                if (first) {
-//                    first = false;
-//                } else {
-//                    sgd.update_epoch();
-//                }
-//                cerr << "**SHUFFLE\n";
-//                random_shuffle(order.begin(), order.end());
-//            }
-//            tot_seen += 1;
-//            const vector<unsigned>& train_sent = corpus.tokens_train[order[si]];
-//            vector<unsigned> tsentence = train_sent;
-//            if (UNK_STRATEGY == 1) {
-//                for (auto& w : tsentence) {
-//                    if (singletons.count(w) && dynet::rand01() < UNK_PROB) {
-//                        w = kUNK;
-//                    }
-//                }
-//            }
-//            const vector<unsigned>& train_pos = corpus.pos_train[order[si]];
-//            const vector<unsigned>& train_gold_acts =
-//                    corpus.correct_act_train[order[si]];
-//            const map<int, unsigned>& train_preds =
-//                    corpus.preds_train[order[si]];
-//
-//            bool skip_sentence = false;
-////            for (unsigned i = 0; i < train_gold_acts.size(); ++i) {
-////                unsigned wi = train_gold_acts[i];
-////                string ww = corpus.act_dict.Convert(wi);
-//////                    cout <<"gold act:"<<ww<< endl;
-//////                    cout << ww.substr(0,2)<<endl;
-////                if (ww.substr(0,2)=="PR") skip_sentence=false;
-////            }
-//            for (unsigned i = 0; i < train_sent.size(); ++i) {
-//                unsigned wi = train_sent[i];
-//                string ww = corpus.tok_dict.Convert(wi);
-//
-//                if (ww=="UNK") skip_sentence=true;
-//
-//            }
-//            ComputationGraph hg;
-//            JointParse partial;
-//            if (!skip_sentence) {
-//
-//                partial = parser.log_prob_parser(&hg, train_sent, tsentence, train_pos,
-//                                                 train_preds, train_gold_acts, &right);
-//                Expression tot_neglogprob = -sum(partial.log_probs);
-//
-//                double lp = as_scalar(hg.incremental_forward(tot_neglogprob));
-//                if (lp < 0) {
-//                    cerr << "Log prob < 0 on sentence " << order[si] << ": lp="
-//                         << lp << endl;
-//                    assert(lp >= 0.0);
-//                }
-//                hg.backward(tot_neglogprob);
-//                sgd.update(1.0);
-//                llh += lp;
-//                trs += train_gold_acts.size();
-//            }
-//            else{
-//                cout<<endl;
-//                for (unsigned i = 0; i < train_sent.size(); ++i) {
-//                    unsigned wi = train_sent[i];
-//                    string ww = corpus.tok_dict.Convert(wi);
-//                    cout << " sent:" << wi<< " raw sent:" << train_sent[i] <<" ww:"<<ww<< endl;
-//                }
-//            }
-//            ++si;
-//
-//        }
-//        sgd.status();
-//        cerr << "update #" << iter << " (epoch "
-//                << (tot_seen / corpus.num_sents) << ")\t" << " llh: " << llh
-//                << " ppl: " << exp(llh / trs) << " err: " << (trs - right) / trs
-//                << endl;
-//        llh = trs = right = 0;
-//
-//        static int logc = 0;
-//        ++logc;
 
 void do_training(Model model, ParserBuilder parser,
                  set<unsigned> training_vocab, set<unsigned> singletons,

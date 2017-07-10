@@ -31,10 +31,45 @@ unsigned VOCAB_SIZE = 0;
 
 bool eval = false;
 dynet::Dict d;
+dynet::Dict ld;//lemma dict, in chinese this is equivalent to word dict
+dynet::Dict pd;//pos dict
 dynet::Dict td;
 int kNONE;
 int kSOS;
 int kEOS;
+
+inline void read_sentence_pair(const std::string& line, std::vector<int>& l, Dict& ld, std::vector<int>& p, Dict& pd,
+                               std::vector<int>& t, Dict& td) {
+    std::istringstream in(line);
+    std::string word;
+    std::string sep = "|||";
+
+    bool groundtruth_sent = false;
+    Dict* d = &td;
+    std::vector<int>* v = &t;
+
+    Dict* lemma_d = &ld;
+    std::vector<int>* lemma_v = &l;
+
+    Dict* pos_d = &pd;
+    std::vector<int>* pos_v = &p;
+
+    while(in) {
+        in >> word;
+        if (!in) break;
+        if (groundtruth_sent){v->push_back(d->convert(word));}
+        else{
+            string delimiter = "~";
+            string lemma = word.substr(0, word.find(delimiter));
+            string pos = word.substr(word.find(delimiter)+1,word.length());
+
+            lemma_v->push_back(lemma_d->convert(lemma));
+            pos_v->push_back(pos_d->convert(pos));
+        }
+        if (word == sep) { groundtruth_sent = true; continue; }
+
+    }
+}
 
 template <class Builder>
 struct RNNLanguageModel {
@@ -170,7 +205,7 @@ int main(int argc, char** argv) {
             cerr << "Usage to train: " << argv[0] << " t corpus.txt dev.txt [model.params]\n";
             return 1;
         }
-        kNONE = td.convert("*");
+//        kNONE = td.convert("*");TODO see whether we need this
         kSOS = d.convert("<s>");
         kEOS = d.convert("</s>");
         vector<pair<vector<int>, vector<int>>> training, dev;
@@ -317,9 +352,9 @@ int main(int argc, char** argv) {
             cerr << "Usage to predict: " << argv[0] << " p predict.txt model.params\n";
             return 1;
         }
-        kNONE = td.convert("*");
-        kSOS = d.convert("<s>");
-        kEOS = d.convert("</s>");
+//        kNONE = td.convert("*");
+//        kSOS = d.convert("<s>");
+//        kEOS = d.convert("</s>");
         vector<pair<vector<int>, vector<int>>> training;
         string line;
         int tlc = 0;
