@@ -22,12 +22,16 @@ using namespace dynet;
 
 float pdrop = 0.5;
 unsigned LAYERS = 1;
-unsigned INPUT_DIM = 128;
+unsigned INPUT_DIM = 128;// this should equal to POS_DIM  + VOCAB_DIM
 unsigned HIDDEN_DIM = 128;
 unsigned TAG_HIDDEN_DIM = 32;
 unsigned TAG_DIM = 32;
 unsigned TAG_SIZE = 0;
 unsigned VOCAB_SIZE = 0;
+unsigned VOCAB_DIM = 0;
+unsigned POS_SIZE= 0;
+unsigned POS_DIM= 12;
+
 
 bool eval = false;
 dynet::Dict d;
@@ -57,7 +61,7 @@ inline void read_sentence_pair(const std::string& line, std::vector<int>& l, Dic
     while(in) {
         in >> word;
         if (!in) break;
-        if (groundtruth_sent){v->push_back(d->convert(word));}
+        if (groundtruth_sent){v->push_back(d->convert(word)); continue;}
         else{
             string delimiter = "~";
             string lemma = word.substr(0, word.find(delimiter));
@@ -73,7 +77,8 @@ inline void read_sentence_pair(const std::string& line, std::vector<int>& l, Dic
 
 template <class Builder>
 struct RNNLanguageModel {
-    LookupParameter p_w;
+    LookupParameter p_w; // lemma embedding, in chinese this is the same as in word embedding
+    LookupParameter p_pos; // pos embedding
     Parameter p_l2th;
     Parameter p_r2th;
     Parameter p_thbias;
@@ -85,7 +90,8 @@ struct RNNLanguageModel {
     explicit RNNLanguageModel(Model& model) :
             l2rbuilder(LAYERS, INPUT_DIM, HIDDEN_DIM, model),
             r2lbuilder(LAYERS, INPUT_DIM, HIDDEN_DIM, model) {
-        p_w = model.add_lookup_parameters(VOCAB_SIZE, {INPUT_DIM});
+        p_w = model.add_lookup_parameters(VOCAB_SIZE, {VOCAB_DIM});
+        p_pos = model.add_lookup_parameters(POS_SIZE, {POS_DIM});
         p_l2th = model.add_parameters({TAG_HIDDEN_DIM, HIDDEN_DIM});
         p_r2th = model.add_parameters({TAG_HIDDEN_DIM, HIDDEN_DIM});
         p_thbias = model.add_parameters({TAG_HIDDEN_DIM});
@@ -149,7 +155,7 @@ struct RNNLanguageModel {
         return sum(errs);
     }
 
-    // return Expression of total loss
+    // return prediction
     vector<int> BuildTaggingGraph_prediction(const vector<int>& sent, ComputationGraph& cg) {
         const unsigned slen = sent.size();
         vector<int> prediction(slen);
