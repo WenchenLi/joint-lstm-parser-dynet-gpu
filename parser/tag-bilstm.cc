@@ -90,7 +90,7 @@ struct RNNLanguageModel {
     explicit RNNLanguageModel(Model& model) :
             l2rbuilder(LAYERS, INPUT_DIM, HIDDEN_DIM, model),
             r2lbuilder(LAYERS, INPUT_DIM, HIDDEN_DIM, model) {
-        p_w = model.add_lookup_parameters(VOCAB_SIZE, {VOCAB_DIM});
+        p_w = model.add_lookup_parameters(VOCAB_SIZE, {VOCAB_DIM});//todo constant?
         p_pos = model.add_lookup_parameters(POS_SIZE, {POS_DIM});
         p_l2th = model.add_parameters({TAG_HIDDEN_DIM, HIDDEN_DIM});
         p_r2th = model.add_parameters({TAG_HIDDEN_DIM, HIDDEN_DIM});
@@ -122,6 +122,7 @@ struct RNNLanguageModel {
         l2rbuilder.add_input(lookup(cg, p_w, kSOS));
         for (unsigned t = 0; t < slen; ++t) {
             i_words[t] = lookup(cg, p_w, sent[t]);
+
             if (!eval) { i_words[t] = noise(i_words[t], 0.1); }
             fwds[t] = l2rbuilder.add_input(i_words[t]);
         }
