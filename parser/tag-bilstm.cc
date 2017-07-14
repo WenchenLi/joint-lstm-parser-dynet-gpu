@@ -16,6 +16,7 @@
 
 #include <boost/archive/text_iarchive.hpp>
 #include <boost/archive/text_oarchive.hpp>
+#include <typeinfo>
 
 using namespace std;
 using namespace dynet;
@@ -91,6 +92,7 @@ struct RNNLanguageModel {
     Parameter p_w2l; // pre-trained word embeddings to LSTM input
     Parameter p_pos2l; // pre-trained word embeddings to LSTM input
 
+    Parameter p_inp_bias; // LSTM input bias
     Parameter p_th2t;
     Parameter p_tbias;
     Builder l2rbuilder;
@@ -99,8 +101,12 @@ struct RNNLanguageModel {
             l2rbuilder(LAYERS, INPUT_DIM, HIDDEN_DIM, *model),
             r2lbuilder(LAYERS, INPUT_DIM, HIDDEN_DIM, *model) {
         cout<<"explicit"<<endl;
+        p_inp_bias = model->add_parameters( { INPUT_DIM, 1 });
+
         cout<<"lemma embedding"<<endl;
-        p_w = model->add_lookup_parameters(ld.size()+1, {VOCAB_DIM, 1});//todo constant for word/chinese lemma embedding?
+
+        cout<<"ld size"<<ld.size()<<endl;
+        p_w = model->add_lookup_parameters(ld.size()+1, {VOCAB_DIM, 1});
         for (auto it : pretrained) {
             p_w.initialize(it.first, it.second);
         }
@@ -129,6 +135,8 @@ struct RNNLanguageModel {
         l2rbuilder.start_new_sequence();
         r2lbuilder.new_graph(cg);  // reset RNN builder for new graph
         r2lbuilder.start_new_sequence();
+
+        Expression inp_bias = parameter(cg, p_inp_bias);
         Expression pos2l = parameter(cg, p_pos2l);
         Expression w2l = parameter(cg, p_w2l);
 
@@ -147,44 +155,57 @@ struct RNNLanguageModel {
         cout<<"build graph: BuildTaggingGraph: left to right"<<endl;
 
         // read sequence from left to right
-        l2rbuilder.add_input(concatenate({lookup(cg, p_w, (unsigned int) kSOS), lookup(cg, p_pos, (unsigned int) pSOS)}));//todo fix to the same length
-        cout<<"l to r, add sos"<<endl;
+        l2rbuilder.add_input(concatenate({lookup(cg, p_w, kSOS), lookup(cg, p_pos, pSOS)}));
         for (unsigned t = 0; t < slen; ++t) {
-            i_words[t] = lookup(cg, p_w, sent.first[t]);
-            i_pos[t] = lookup(cg, p_pos, sent.second[t]);
-//            cout<<"look up done"<<endl;
-//            Expression i_word_pos_t = concatenate({i_words[t], i_pos[t]});
-            i_word_pos[t] = concatenate({i_words[t], i_pos[t]});
-//            cout<<"concatenate done"<<endl;
-            if (!eval) {
-//                cout<<"not eval"<<endl;
-                i_word_pos[t] = noise(i_word_pos[t], 0.1);
-//                cout<<"add noise done"<<endl;
-            }
+            Expression w = const_lookup(cg, p_w, sent.first[t]);
+            Expression p = lookup(cg, p_pos, sent.second[t]);
+            i_word_pos[t]=affine_transform({inp_bias,pos2l,p,w2l,w });//concatenate({i_words[t], i_pos[t]});
+//            if (!eval) {
+//                i_word_pos[t] = noise(i_word_pos[t], 0.1);
+//            }
             fwds[t] = l2rbuilder.add_input(i_word_pos[t]);
+            cout<<fwds.size()<<endl;
 
-//            cout<<"fwds done"<<endl;
         }
+
 
         cout<<"build graph: BuildTaggingGraph: right to left"<<endl;
         // read sequence from right to left
         r2lbuilder.add_input(concatenate({lookup(cg, p_w, kEOS),lookup(cg,p_pos,pEOS)}));
-        for (unsigned t = 0; t < slen; ++t)
+        for (unsigned t = 0; t < slen; ++t) {
             revs[slen - t - 1] = r2lbuilder.add_input(i_word_pos[slen - t - 1]);
+//            cout<<revs[t].value()<<endl;
+            cout<<revs.size()<<endl;
+
+        }
 
         cout<<"build graph: BuildTaggingGraph: get loss_expr"<<endl;
         for (unsigned t = 0; t < slen; ++t) {
+            cout<<"t"<<t<<endl;
             if (tags[t] != kNONE) {
+                cout<<"tags[t] != kNONE"<<endl;
                 if (ntagged) (*ntagged)++;
+                cout<<"i_th"<<endl;
+
                 Expression i_th = tanh(affine_transform({i_thbias, i_l2th, fwds[t], i_r2th, revs[t]}));
+                cout<<"i_t"<<endl;
+
+
                 Expression i_t = affine_transform({i_tbias, i_th2t, i_th});
                 if (cor) {
+                    cout<<"cor"<<endl;
+                    cout<<"i_t"<< i_t.dim()<<endl;
+                    cg.incremental_forward(i_t);
+                    cout<<"as vec"<<endl;
                     vector<float> dist = as_vector(cg.incremental_forward(i_t));
+                    cout<<"dist"<<endl;
                     double best = -9e99;
                     int besti = -1;
-                    for (int i = 0; i < dist.size(); ++i) {
+                    cout<<"for"<<endl;
+                    for (unsigned i = 0; i < dist.size(); ++i) {
                         if (dist[i] > best) { best = dist[i]; besti = i; }
                     }
+                    cout<<"tag if"<<endl;
                     if (tags[t] == besti) (*cor)++;
                 }
                 if (tags[t] != kNONE) {
