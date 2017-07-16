@@ -7,18 +7,13 @@ WORD_EMBEDDING=data/word_embedding/wiki.zh.wang2vec.100.vec
 
 TRAIN_CONLL_DATA=data/conll2009/CoNLL2009-ST-Chinese/CoNLL2009-ST-Chinese-train.txt
 DEV_CONLL_DATA=data/conll2009/CoNLL2009-ST-Chinese/CoNLL2009-ST-Chinese-development.txt
-TEST_CONLL_DATA=data/conll2009/CoNLL2009-ST-Chinese/CoNLL2009-ST-evaluation-Chinese.txt
-#TEST_OOD_DATA=data/conll2009/CoNLL2009-ST-Chinese/CoNLL2009-ST-evaluation-Chinese-ood.txt
-
 
 
 TRAIN_DATA=$WORKING_DIR/train.transitions
 DEV_DATA=$WORKING_DIR/dev.transitions
-TEST_DATA=$WORKING_DIR/test.transitions
-
 
 TRAIN_CONLL_LEMMA=$1/train.conll.pb.lemmas
 
 
 #train
-cmake-build-debug/parser/lstm-parse --test -T $TRAIN_DATA -d $DEV_DATA --model $MODEL -w $WORD_EMBEDDING --propbank_lemmas $TRAIN_CONLL_LEMMA  -g $DEV_CONLL_DATA -e eval09.pl -s dev.predictions.conll
+cmake-build-debug/parser/lstm-parse --predict -T $TRAIN_DATA -d $DEV_DATA --model $MODEL -w $WORD_EMBEDDING --propbank_lemmas $TRAIN_CONLL_LEMMA  -g $DEV_CONLL_DATA -e eval09.pl -s dev.predictions.conll

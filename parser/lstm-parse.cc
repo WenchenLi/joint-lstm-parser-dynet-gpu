@@ -103,7 +103,9 @@ void init_command_line(int argc, const char *const *argv, po::variables_map* con
             "lemmas mapped to senses in propbank")("lstm_input_dim",
             po::value<unsigned>()->default_value(100), "LSTM input dimension")(
             "dropout", po::value<float>()->default_value(0.2f), "Dropout rate")(
-            "train,t", "Should training be run?")("words,w",
+            "train,t", "Should training be run?")(
+            "test,test", "Should testing be run?")(
+            "predict,predict", "Should predicting be run?")("words,w",
             po::value<string>(), "pretrained word embeddings")("use_lowerwv",
             "Lowercase tokens for wv compatibility")("use_spelling,S",
             "Use spelling model")("gold_conll,g", po::value<string>(),
@@ -1043,6 +1045,38 @@ void compute_joint_correct(JointParse gold, JointParse pred,
     }
 }
 
+
+void predict(ParserBuilder parser,
+                  const unsigned kUNK, set<unsigned> training_vocab,
+                  po::variables_map conf) {
+//    auto time_begin = chrono::high_resolution_clock::now();
+    unsigned corpus_size = corpus.num_sents_dev;
+    double right = 0;
+    for (unsigned idx = 0; idx < corpus_size; ++idx) {
+        const vector<unsigned> &toks_dev = corpus.tokens_dev[idx];
+//        const vector<string> &oov_toks_dev = corpus.oov_tokens_dev[idx];
+        const vector<unsigned> &pos_dev = corpus.pos_dev[idx];
+        const map<int, unsigned> &preds_dev = corpus.preds_dev[idx];
+//        const map<int, string> &oov_preds_dev = corpus.oov_preds_dev[idx];
+
+        vector<unsigned> tsentence = toks_dev; // TODO(Miguel): what's this?
+        if (!USE_SPELLING) {
+            for (auto &w : tsentence) {
+                if (training_vocab.count(w) == 0) {
+                    w = kUNK;
+                }
+            }
+        }
+        ComputationGraph cg;
+        JointParse predicted;
+        predicted = parser.log_prob_parser(&cg, toks_dev, tsentence,
+                                           pos_dev, preds_dev, vector<unsigned>(), &right);
+
+        predicted.print();
+    }
+}
+
+
 void do_test_eval(const unsigned beam_size, ParserBuilder parser,
         const unsigned kUNK, set<unsigned> training_vocab,
         po::variables_map conf) {
@@ -1070,6 +1104,7 @@ void do_test_eval(const unsigned beam_size, ParserBuilder parser,
                 }
             }
         }
+
 
         ComputationGraph cg;
         double log_prob = 0;
@@ -1317,7 +1352,7 @@ int main(int argc, char** argv) {
             << LSTM_INPUT_DIM << '_' << POS_DIM << '_' << REL_DIM << "_pid"
             << getpid() << ".params";
     param_fname = os.str();
-    cerr << "Parameters will be written to: " << param_fname << endl;
+    if (conf.count("train")) cerr << "Parameters will be written to: " << param_fname << endl;
     output_conll = conf["output_conll"].as<string>().c_str();
 
     // training data is required even at test time to do OOV handling
@@ -1400,7 +1435,16 @@ int main(int argc, char** argv) {
                 conf);
     }
 
-    cerr << "Testing..." << endl;
-    do_test_eval(BEAM_SIZE, parser, kUNK, training_vocab, conf);
+    //TESTING
+    if (conf.count("test")) {
+        cerr << "Testing started..." << endl;
+        do_test_eval(BEAM_SIZE, parser, kUNK, training_vocab, conf);
+    }
+
+    //PREDICTING
+    if (conf.count("predict")) {
+        cerr << "Testing started..." << endl;
+        predict( parser, kUNK, training_vocab, conf);
+    }
     return 0;
 }

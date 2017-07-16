@@ -84,23 +84,10 @@ current result with wang2vec trained with wiki dump, use mkl on single thread.
 ```
 
 ##
-todo :
-1. training got error to fix 
+Future todo :
+1. 
 
-```$xslt
-correct action SR(A1) not in the list of Valid Actions:
-PR(UNK)
-problem in forbidden actions implementation
-
-```
-2. gpu support[cnn module build to cuda]
-dynet with gpu doesnt helps a lot on batch = 1, need to implement batch size options but doubt that
-will helps a lot since computing related to other non matrix operations.[give more detail here] 
-
+2. 
 
 3. predict
 
-3.1 predicate identification
-    https://github.com/clab/lstm-parser, 
-    
-3.2 predict role labels
