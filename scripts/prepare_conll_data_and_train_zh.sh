@@ -37,4 +37,4 @@ rm $TRAIN_CONLL_LEMMA
 TRAIN_CONLL_LEMMA=$WORKING_DIR/train.conll.pb.lemmas
 #train
 
-cmake-build-debug/parser/lstm-parse -T $TRAIN_DATA -d $DEV_DATA -w $WORD_EMBEDDING --propbank_lemmas $TRAIN_CONLL_LEMMA -g $DEV_CONLL_DATA -e eval09.pl -s dev.wang_work.predictions.conll --out_model $WORKING_DIR/joint.model -t
+cmake-build-debug/parser/lstm-parse -T $TRAIN_DATA -d $DEV_DATA -w $WORD_EMBEDDING --propbank_lemmas $TRAIN_CONLL_LEMMA -g $DEV_CONLL_DATA -e eval09.pl -s dev.wang_work.predictions.conll --out_model $WORKING_DIR/joint.model --train

@@ -9,6 +9,8 @@ corresponding working_dir: wang_old_works_mkl
 [our conll 2009 format data trained model](https://1drv.ms/u/s!Ao_Ao41kyU6BgdweIVTZC3Pj3mkZAA)
 corresponding working_dir: ours
 
+[wang2vec embedding](https://1drv.ms/u/s!Ao_Ao41kyU6BgdwbrYB1GX1rhc5ziA)
+embedding file suppose to be under data/word_embedding
 #### Required software
 
  * A C++ compiler supporting the [C++11 language standard](https://en.wikipedia.org/wiki/C%2B%2B11), g++4.8.5 tested working
