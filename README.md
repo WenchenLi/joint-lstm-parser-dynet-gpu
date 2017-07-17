@@ -1,4 +1,4 @@
-# lstm-parser
+# join syntactic and semantic parser
 Transition-based joint syntactic dependency parser and semantic role labeler using stack LSTM RNN architecture
 
 #### Required software
@@ -7,69 +7,56 @@ Transition-based joint syntactic dependency parser and semantic role labeler usi
  * [Boost](http://www.boost.org/) libraries, 1.60 compiled with g++4.8.5 
  * [Eigen](http://eigen.tuxfamily.org) (newer versions strongly recommended, 3.3.3)
  * [CMake](http://www.cmake.org/)
- * This runs with the older version of cnn/dynet : `cnn-v1`
+ * [intel mkl](https://software.intel.com/en-us/mkl)[default required]recommended,speed up parser training 1.5~2 faster
+ * This runs with the older version of dynet : `commit:814f1819e4b7a75cb490b6a242a40e55f5ce7a1b
+`notice: might not work with dynet 2.0 (not tested)
 
 #### Checking out the project for the first time
 
-The first time you clone the repository, you need to sync the `cnn/` submodule.(eigen and boost install included)
+The first time you clone the repository, you need to sync the `dynet/` submodule.(eigen and boost install included)
 
     sh scripts/prepare_submodule.sh
 
+#### Prepare other dependencies
+    ```
+    sh scripts/prepare_eigen.sh
+    sh scripts/prepare_boost.sh
+    sh scripts/prepare_mkl.sh
+    ```
 #### Build instructions
 
     sh scripts/build.sh
 
 #### Train a parsing model
-
-The data must be in the [CoNLL 2009 format](https://ufal.mff.cuni.cz/conll2009-st/task-description.html). For best performance, it is suggested to [projectivize the treebank data](http://www.maltparser.org/userguide.html#singlemalt_info). As a preprocessing step, first convert the treebank data (in CoNLL 2009 format) into transitions, \*.transitions (this is a format usable by the joint parser), using the following commands.
-
-    java -jar ../jointOracle.jar -inp train.conll -lemmas true > train.transitions
-    java -jar ../jointOracle.jar -inp dev.conll > dev.transitions
-    
-Note that it is required to set the option ''lemmas'' to true for the training data, so that an auxilliary file, train.conll.pb.lemmas is generated, which saves the lemmas of all the predicate words. The joint parser can now run on the generated files.
-
-    parser/lstm-parse -T train.transitions -d dev.transitions -w sskip.100.vectors --propbank_lemmas train.conll.pb.lemmas -g dev.conll -e ../eval09.pl -s dev.predictions.conll --out_model joint.model -t
-    
-Link to the word vectors that we used in the ACL 2015 paper for English: [sskip.100.vectors](https://drive.google.com/file/d/0B8nESzOdPhLsdWF2S1Ayb1RkTXc/view?usp=sharing). The evaluation script, eval09.pl, is provided by [CoNLL 2009](https://ufal.mff.cuni.cz/conll2009-st/scorer.html). The model is written to the current directory.
-
-Note-1: you can also run it without word embeddings by removing the -w option for both training and parsing.
-
-Note-2: the training process should be stopped when the development Macro F1 does not substantially improve anymore.
-
-Note-3: the default hyperparameters are the same as in the [paper](http://arxiv.org/abs/1606.08954) for the CoNLL 2009 English model. These can be changed by altering the command-line options provided in the lstm-parse.cc code.
-
-#### Parse data with your parsing model
-
-The test.conll file must also be in to the [CoNLL 2009 data format](https://ufal.mff.cuni.cz/conll2009-st/task-description.html) .
-
-    java -jar ../jointOracle.jar -inp test.conll > test.transitions
-
-    parser/lstm-parse -T train.transitions -d test.transitions -w sskip.100.vectors --propbank_lemmas train.conll.pb.lemmas -m joint.model -s test.predictions.conll -g test.conll -e ../eval09.pl 
-
-The parser will output a file test.predictions.conll with predicted syntax and SRL dependencies.
-
-#### Citation
-
-If you make use of this software, please cite the following:
-
-    @inproceedings{swayamdipta:2016conll,
-    author={Swabha Swayamdipta and Miguel Ballesteros and Chris Dyer and Noah A. Smith},
-    title={Greedy, Joint Syntactic-Semantic Parsing with Stack LSTMs},
-    booktitle={Proc. of CoNLL},
-    year={2016}
-    }
-
-#### Contact
-
-For questions and usage issues, please contact swabha@cs.cmu.edu
-
-
-
-## current results
-current result with wang2vec trained with wiki dump, use mkl on single thread.
+Once you successfully build lstm-parse, we can continue to train the model:
 
 ```
-08105
+sh scripts/prepare_conll_data_and_train_zh.sh $WORKING_DIR $EMBEDDING
+ 
+```
+$WORKING_DIR keeps reference to the trained model(joint.model), as well as all the necessary train/dev data
+$EMBEDDING to specify the word embedding to train the model, [wang2vec](https://github.com/wlin12/wang2vec) suggested. 
+
+to resume training:
+
+```
+sh scripts/resume_training.sh $WORKING_DIR $WORD_EMBEDDING $MODEL
+```
+
+#### Testing 
+`sh scripts/test.sh $WORKING_DIR $WORD_EMBEDDING $MODEL`
+
+#### Predicting
+
+```
+sh scripts/predict.sh $WORKING_DIR $WORD_EMBEDDING $MODEL
+```
+
+## current results
+
+###  result on official conll 2009 dev data with wang2vec trained with wiki dump, use mkl on single thread.
+
+```
 [epoch=69 eta=0.0153374 clips=85 updates=100] update #15394 (epoch 69.1072)	 llh: 4980.81 ppl: 1.51411 err: 0.0898642
 [epoch=69 eta=0.0153374 clips=85 updates=100] update #15395 (epoch 69.1116)	 llh: 4838.37 ppl: 1.49128 err: 0.0852399
 [epoch=69 eta=0.0153374 clips=75 updates=100] update #15396 (epoch 69.1161)	 llh: 4759.13 ppl: 1.4869 err: 0.0904393
@@ -79,14 +66,42 @@ current result with wang2vec trained with wiki dump, use mkl on single thread.
 [epoch=69 eta=0.0153374 clips=81 updates=100] update #15400 (epoch 69.1341)	 llh: 5530.8 ppl: 1.52136 err: 0.0899021
   **dev (iter=15400 epoch=69.1341)	 llh=0 ppl: 1 err: 1 las: 79.01 semF1: 79.04 macro:79.04	[1762 sents in 39816.8 ms]
 
+```
+
+### result on our own conll 2009 data  with wang2vec trained with wiki dump, use mkl on single thread.
+
+```
+
+[epoch=70 eta=0.0151515 clips=56 updates=100] update #12996 (epoch 70.6858)	 llh: 1139.36 ppl: 1.37206 err: 0.0816213
+[epoch=70 eta=0.0151515 clips=57 updates=100] update #12997 (epoch 70.6912)	 llh: 1017.06 ppl: 1.33381 err: 0.0705183
+[epoch=70 eta=0.0151515 clips=52 updates=100] update #12998 (epoch 70.6967)	 llh: 982.284 ppl: 1.34805 err: 0.0741867
+[epoch=70 eta=0.0151515 clips=46 updates=100] update #12999 (epoch 70.7021)	 llh: 886.387 ppl: 1.29362 err: 0.06535
+[epoch=70 eta=0.0151515 clips=56 updates=100] update #13000 (epoch 70.7076)	 llh: 1011.8 ppl: 1.31518 err: 0.074736
+  **dev (iter=13000 epoch=70.7076)	 llh=0 ppl: 1 err: 1 las: 88.01 semF1: 76.9 macro:82.46	[3294 sents in 13458.6 ms]
+[epoch=70 eta=0.0151515 clips=56 updates=100] update #13001 (epoch 70.713)	 llh: 1010.82 ppl: 1.3321 err: 0.0729078
+[epoch=70 eta=0.0151515 clips=49 updates=100] update #13002 (epoch 70.7184)	 llh: 989.865 ppl: 1.33044 err: 0.0695125
+[epoch=70 eta=0.0151515 clips=49 updates=100] update #13003 (epoch 70.7239)	 llh: 842.52 ppl: 1.29604 err: 0.0627886
+[epoch=70 eta=0.0151515 clips=48 updates=100] update #13004 (epoch 70.7293)	 llh: 960.099 ppl: 1.3176 err: 0.0669348
+[epoch=70 eta=0.0151515 clips=56 updates=100] update #13005 (epoch 70.7348)	 llh: 916.987 ppl: 1.30957 err: 0.0682353
 
 
 ```
 
 
-
 ## online predict
-under example/ predict_example.transition
+
+Here is the example input to the parsing system:
+
+under example/ predict_example.transition:
+we have input[to get the input, please see predicate_identification project]:
+```
+
+中国-NR, 最大-JJ, 氨纶丝-NN, 生产-NN, 基地-NN, 在-P, 连云港-NR, 建成-VV~建成, ROOT-NOTAG
+
+王翔-NR, 虽-CS, 年过半百-VV~年过半百, ，-PU, 但-AD, 其-PN, 充沛-VV~充沛, 的-DEC, 精力-NN, 和-CC, 敏捷-NN~敏捷, 的-DEG, 思维-NN, ，-PU, 给-VV~给, 人-NN, 以-P, 一-CD, 个-M, 挑战者-NN, 的-DEG, 印象-NN, 。-PU, ROOT-NOTAG
+
+```
+and the system output:
 ```
 predicates:
 7:PR(建成.01)
@@ -140,11 +155,64 @@ syn-arcs:
 23-LA(ROOT)->22
 -1-ERROR->23
 ```
-##
-Future todo :
-1. 
 
-2. 
+where parsing sentence results are seperated by -1-ERROR->num, and for each sentence, 
+we have sentence predicate disambiguation:predicates:
+semantic dependencies: sem-arcs, 
+and syntactic dependencies: syn-arcs. 
+Notice the order of the sentence start from 0. 
 
-3. predict
+Below, is an example:
+
+data input to the parser system: 
+```
+中国-NR, 最大-JJ, 氨纶丝-NN, 生产-NN, 基地-NN, 在-P, 连云港-NR, 建成-VV~建成, ROOT-NOTAG
+
+```
+
+data output by the parser system:
+```
+predicates:
+7:PR(建成.01)
+sem-arcs:
+4<- 7[SL(A1)], 
+5<- 7[SL(LOC)], 
+syn-arcs:
+4-LA(NMOD)->0
+4-LA(AMOD)->1
+4-LA(NMOD)->2
+4-LA(NMOD)->3
+7-LA(SBJ)->4
+7-LA(LOC)->5
+5-RA(OBJ)->6
+8-LA(ROOT)->7
+-1-ERROR->8
+
+```
+
+data conll 2009 format:
+```
+1	中国	中国	中国	NR	NR	_	_	5	5	NMOD	NMOD	_	_	_
+2	最大	最大	最大	JJ	JJ	_	_	5	5	AMOD	AMOD	_	_	_
+3	氨纶丝	氨纶丝	氨纶丝	NN	NN	_	_	5	5	NMOD	NMOD	_	_	_
+4	生产	生产	生产	NN	NN	_	_	5	5	NMOD	NMOD	_	_	_
+5	基地	基地	基地	NN	NN	_	_	8	8	SBJ	SBJ	_	_	A1
+6	在	在	在	P	P	_	_	8	8	LOC	LOC	_	_	LOC
+7	连云港	连云港	连云港	NR	NR	_	_	6	6	OBJ	OBJ	_	_	_
+8	建成	建成	建成	VV	VV	_	_	0	0	ROOT	ROOT	Y	建成.01	_
+
+```
+
+you can compare to the gold standard[data conll 2009 format], the parser correctly 
+a. disambiguate the predicate
+b. find the semantic dependencies[4<- 7, 5<- 7] and it's role [SL(A1),SL(LOC)], where SL are transition actions. 
+
+
+# references
+
+1.[Swayamdipta, Swabha et al. “Greedy, Joint Syntactic-Semantic Parsing with Stack LSTMs.” CoNLL (2016).](https://www.semanticscholar.org/paper/Greedy-Joint-Syntactic-Semantic-Parsing-with-Stack-Swayamdipta-Ballesteros/777a1606544ee8348f5154d483bae65b2a50b8b6)
+[paper presentation ACL](http://techtalks.tv/talks/greedy-joint-syntactic-semantic-parsing-with-stack-lstms/63397/)
+[slides](https://www.cs.cmu.edu/~sswayamd/talks/conll16.pdf)
+
+2.[Ling, Wang et al. “Two/Too Simple Adaptations of Word2Vec for Syntax Problems.” HLT-NAACL (2015).](https://www.semanticscholar.org/paper/Two-Too-Simple-Adaptations-of-Word2Vec-for-Syntax-Ling-Dyer/b92513dac9d5b6a4683bcc625b94dd1ced98734e)
 

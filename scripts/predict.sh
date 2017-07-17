@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # $1 is working directory name
 WORKING_DIR=$1
-MODEL=$2
+WORD_EMBEDDING=$2
+MODEL=$3
 
 WORD_EMBEDDING=data/word_embedding/wiki.zh.wang2vec.100.vec
 TRAIN_DATA=$WORKING_DIR/train.transitions
