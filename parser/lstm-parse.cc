@@ -1423,7 +1423,7 @@ int main(int argc, char** argv) {
         ia >> model;
     }
 
-    cout<< "load dev/predict corpus"<<endl;
+    cout<< "loading dev/predict corpus"<<endl;
     if (conf.count("train") || conf.count("test")) {// only train or test to load dev/test corpus
         // OOV words in dev/test data are replaced by UNK
         corpus.load_correct_actions_dev(conf["dev_data"].as<string>());
@@ -1433,8 +1433,8 @@ int main(int argc, char** argv) {
         cerr<<"you need to specify the train/test/predict flag"<<endl;
         exit(1);
     }
-
     cout<< "done load dev/predict corpus"<<endl;
+
     if (conf.count("propbank_lemmas")) {// we always need propbank lemmas
         corpus.load_train_preds(conf["propbank_lemmas"].as<string>());
     }
