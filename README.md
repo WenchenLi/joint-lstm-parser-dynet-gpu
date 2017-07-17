@@ -83,6 +83,63 @@ current result with wang2vec trained with wiki dump, use mkl on single thread.
 
 ```
 
+
+
+## online predict
+under example/ predict_example.transition
+```
+predicates:
+7:PR(建成.01)
+sem-arcs:
+4<- 7[SL(A1)], 
+5<- 7[SL(LOC)], 
+syn-arcs:
+4-LA(NMOD)->0
+4-LA(AMOD)->1
+4-LA(NMOD)->2
+4-LA(NMOD)->3
+7-LA(SBJ)->4
+7-LA(LOC)->5
+5-RA(OBJ)->6
+8-LA(ROOT)->7
+-1-ERROR->8
+predicates:
+2:PR(UNK)
+6:PR(充沛.01)
+10:PR(UNK)
+14:PR(给.01)
+sem-arcs:
+0<- 2[SL(A0)], 
+1<- 2[SL(DIS)], 
+8<- 6[SR(A0)], 
+12<- 10[SR(A0)], 
+15<- 14[SR(A1)], 
+syn-arcs:
+2-LA(SBJ)->0
+2-LA(ADV)->1
+22-LA(ADV)->2
+22-LA(UNK)->3
+22-LA(ADV)->4
+8-LA(NMOD)->5
+7-LA(COMP)->6
+8-LA(RELC)->7
+22-LA(SBJ)->8
+8-RA(CJTN)->9
+11-LA(COMP)->10
+12-LA(RELC)->11
+9-RA(CJT)->12
+22-LA(UNK)->13
+22-LA(ADV)->14
+14-RA(COMP)->15
+22-LA(MNR)->16
+19-LA(DMOD)->17
+17-RA(COMP)->18
+20-LA(COMP)->19
+21-LA(NMOD)->20
+16-RA(OBJ)->21
+23-LA(ROOT)->22
+-1-ERROR->23
+```
 ##
 Future todo :
 1. 

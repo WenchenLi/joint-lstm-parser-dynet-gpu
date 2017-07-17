@@ -1359,7 +1359,7 @@ int main(int argc, char** argv) {
 
     VOCAB_SIZE = corpus.tok_dict.size() + 1;
     ACTION_SIZE = corpus.act_dict.size() + 1; // +1 to account for unknown actions
-    POS_SIZE = corpus.pos_vocab_size + 10; // To account for extra POS tags we might see in dev. TODO
+    POS_SIZE = corpus.pos_vocab_size + 10; // To account for extra POS tags we might see in dev. TODO should define the complete set of POS tags
     PRED_SIZE = corpus.lemma_dict.size() + 1; // +1 to account for unknown predicates
     if (corpus.char_vocab_size > 255) {
         CHAR_SIZE = corpus.char_vocab_size;
