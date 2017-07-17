@@ -77,8 +77,9 @@ void init_command_line(int argc, const char *const *argv, po::variables_map* con
     po::options_description opts("Configuration options");
     opts.add_options()("training_data,T", po::value<string>(),
             "list of Transitions - training corpus")("dev_data,d",
-            po::value<string>(), "Development corpus")("test_data,p",
-            po::value<string>(), "Test corpus")("unk_strategy,o",
+            po::value<string>(), "Development corpus")("test_data,y",
+            po::value<string>(), "Test corpus")("predict_data,predict_data", po::value<string>(),
+                                                "sentences to be predicted")("unk_strategy,o",
             po::value<unsigned>()->default_value(1),
             "Unknown word strategy: 1 = singletons become UNK with probability unk_prob")(
             "unk_prob,u", po::value<double>()->default_value(0.2),
@@ -112,8 +113,8 @@ void init_command_line(int argc, const char *const *argv, po::variables_map* con
             "Gold dev/test conll file for eval")("output_conll,s",
             po::value<string>(), "Predicted dev/test conll file for eval")(
             "eval_script,e", po::value<string>(),
-            "CONLL 2009 evaluation script")("cnn_mem",
-            po::value<unsigned>()->default_value(1024), "cnn memory")("help,h",
+            "CONLL 2009 evaluation script")("dynet_mem",
+            po::value<unsigned>()->default_value(512), "dynet memory")("help,h",
             "Help");
     po::options_description dcmdline_options;
     dcmdline_options.add(opts);
@@ -1049,17 +1050,14 @@ void compute_joint_correct(JointParse gold, JointParse pred,
 void predict(ParserBuilder parser,
                   const unsigned kUNK, set<unsigned> training_vocab,
                   po::variables_map conf) {
-//    auto time_begin = chrono::high_resolution_clock::now();
-    unsigned corpus_size = corpus.num_sents_dev;
+    unsigned corpus_size = corpus.num_sents_predict;
     double right = 0;
     for (unsigned idx = 0; idx < corpus_size; ++idx) {
-        const vector<unsigned> &toks_dev = corpus.tokens_dev[idx];
-//        const vector<string> &oov_toks_dev = corpus.oov_tokens_dev[idx];
-        const vector<unsigned> &pos_dev = corpus.pos_dev[idx];
-        const map<int, unsigned> &preds_dev = corpus.preds_dev[idx];
-//        const map<int, string> &oov_preds_dev = corpus.oov_preds_dev[idx];
+        const vector<unsigned> &toks_predict = corpus.tokens_predict[idx];
+        const vector<unsigned> &pos_predict = corpus.pos_predict[idx];
+        const map<int, unsigned> &preds_predict = corpus.preds_predict[idx];
 
-        vector<unsigned> tsentence = toks_dev; // TODO(Miguel): what's this?
+        vector<unsigned> tsentence = toks_predict; // TODO(Miguel): what's this?
         if (!USE_SPELLING) {
             for (auto &w : tsentence) {
                 if (training_vocab.count(w) == 0) {
@@ -1069,8 +1067,8 @@ void predict(ParserBuilder parser,
         }
         ComputationGraph cg;
         JointParse predicted;
-        predicted = parser.log_prob_parser(&cg, toks_dev, tsentence,
-                                           pos_dev, preds_dev, vector<unsigned>(), &right);
+        predicted = parser.log_prob_parser(&cg, toks_predict, tsentence,
+                                           pos_predict, preds_predict, vector<unsigned>(), &right);
 
         predicted.print();
     }
@@ -1355,7 +1353,8 @@ int main(int argc, char** argv) {
     if (conf.count("train")) cerr << "Parameters will be written to: " << param_fname << endl;
     output_conll = conf["output_conll"].as<string>().c_str();
 
-    // training data is required even at test time to do OOV handling
+    // training data is required even at test time to do OOV handling, reading on single core is fast enough,
+    // no need to store elsewhere
     corpus.load_correct_actions(conf["training_data"].as<string>());
 
     VOCAB_SIZE = corpus.tok_dict.size() + 1;
@@ -1370,6 +1369,7 @@ int main(int argc, char** argv) {
     kROOT_SYMBOL = corpus.get_or_add_word(ROOT_SYMBOL);
 
     // Loading pretrained word embeddings....
+    // TODO loading wang2vec is slow, need to cache embedding in memory for online usage
     if (conf.count("words")) {
         pretrained[kUNK] = vector<float>(PRETRAINED_DIM, 0);
         cerr << "Loading from " << conf["words"].as<string>() << " with "
@@ -1398,7 +1398,7 @@ int main(int argc, char** argv) {
 
     // Computing the singletons in the parser's training data for OOV replacement
     set<unsigned> training_vocab; // words available in the training corpus
-    set<unsigned> singletons;
+    set<unsigned> singletons;// words appears only once in the training corpus
     {
         map<unsigned, unsigned> counts;
         for (auto sent : corpus.tokens_train) {
@@ -1417,14 +1417,25 @@ int main(int argc, char** argv) {
     Model model;
     ParserBuilder parser(&model, pretrained);
     if (conf.count("model")) {
+        cout<< "load trained model..."<<endl;
         ifstream in(conf["model"].as<string>().c_str());
         boost::archive::text_iarchive ia(in);
         ia >> model;
     }
 
-    // OOV words in dev/test data are replaced by UNK
-    corpus.load_correct_actions_dev(conf["dev_data"].as<string>());
-    if (conf.count("propbank_lemmas")) {
+    cout<< "load dev/predict corpus"<<endl;
+    if (conf.count("train") || conf.count("test")) {// only train or test to load dev/test corpus
+        // OOV words in dev/test data are replaced by UNK
+        corpus.load_correct_actions_dev(conf["dev_data"].as<string>());
+    }else if(conf.count("predict")){//load predict_sentence
+        corpus.load_predict_sentence(conf["predict_data"].as<string>());
+    }else{
+        cerr<<"you need to specify the train/test/predict flag"<<endl;
+        exit(1);
+    }
+
+    cout<< "done load dev/predict corpus"<<endl;
+    if (conf.count("propbank_lemmas")) {// we always need propbank lemmas
         corpus.load_train_preds(conf["propbank_lemmas"].as<string>());
     }
 
@@ -1443,7 +1454,7 @@ int main(int argc, char** argv) {
 
     //PREDICTING
     if (conf.count("predict")) {
-        cerr << "Testing started..." << endl;
+        cerr << "predicting started..." << endl;
         predict( parser, kUNK, training_vocab, conf);
     }
     return 0;

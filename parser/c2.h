@@ -39,6 +39,14 @@ public:
     map<int, map<int, string>> oov_preds_dev;
     unsigned num_sents_dev;
 
+    map<int, vector<unsigned>> correct_act_predict;
+    map<int, vector<unsigned>> tokens_predict;
+    map<int, vector<string>> oov_tokens_predict;
+    map<int, vector<unsigned>> pos_predict;
+    map<int, map<int, unsigned>> preds_predict;
+    map<int, map<int, string>> oov_preds_predict;
+    unsigned num_sents_predict;
+
     Dict act_dict;
     set<act_name> act_types;
     vector<act_name> all_corpus_acts;
@@ -432,6 +440,201 @@ public:
         cerr << "#POStags: " << pos_vocab_size << endl;
         cerr << "#actions: " << act_dict.size() << endl;
         cerr << "#action types: " << act_types.size() << endl;
+        cerr << "#preds:" << lemma_dict.size() << endl;
+        cerr << "#OOV preds:" << oov_lemma_dict.size() << endl;
+    }
+
+    inline void load_predict_sentence(string file) {
+        tok_dict.Freeze(); // contains all tokens in train set, and if used, pre-trained embedding
+        tok_dict.SetUnk(UNK);
+
+        act_dict.Freeze();
+        act_dict.SetUnk(PR_UNK);
+        get_all_acts(act_dict, all_corpus_acts, act_types);
+
+        map < act_name, string > some_label;
+        get_some_act_label (some_label);
+
+        lemma_dict.Freeze();
+        lemma_dict.SetUnk(UNK);
+
+        ifstream predict_actions_file(file);
+        string predict_line;
+        assert(pos_vocab_size > 1);
+        assert(token_vocab_size > 3);
+
+        vector<unsigned> current_sent;
+        vector < string > current_sent_oov;
+        vector<unsigned> current_posseq;
+        map<int, unsigned> current_predmap;
+        map<int, string> current_predmap_oov;
+
+        int sent_idx = -1;
+        bool inp_line = false;
+        bool first_ex = true;
+
+        string token, pos, pred, tok_pos_pair;
+        unsigned num_tokens = 0;
+
+        while (getline(predict_actions_file, predict_line)) {
+            replace_str_in_place(predict_line, "-RRB-", "_RRB_");
+            replace_str_in_place(predict_line, "-LRB-", "_LRB_");
+
+            if (predict_line.empty()) { // end of example
+                if (!first_ex) {
+                    tokens_predict[sent_idx] = current_sent;
+                    oov_tokens_predict[sent_idx] = current_sent_oov;
+                    pos_predict[sent_idx] = current_posseq;
+                    preds_predict[sent_idx] = current_predmap;
+                    oov_preds_predict[sent_idx] = current_predmap_oov;
+                } else {
+                    first_ex = false;
+                }
+                sent_idx++;
+                inp_line = true;
+                current_sent.clear();
+                current_sent_oov.clear();
+                current_posseq.clear();
+                current_predmap.clear();
+                current_predmap_oov.clear();
+            } else if (inp_line) {
+                // read inp line tok by tok
+
+                istringstream iss(predict_line);
+                if (sent_idx % 1000 == 0)
+                    cerr << sent_idx << "...";
+
+                do {
+                    tok_pos_pair.clear();
+                    iss >> tok_pos_pair;
+                    if (tok_pos_pair.size() == 0) {
+                        continue;
+                    }
+                    // remove the trailing comma if need be.
+                    if (tok_pos_pair[tok_pos_pair.size() - 1] == ',') {
+                        tok_pos_pair = tok_pos_pair.substr(0,
+                                                           tok_pos_pair.size() - 1);
+                    }
+                    // split the string (at '-') into word and POS tag.
+                    size_t postag_charpos = tok_pos_pair.rfind('-');
+                    size_t pred_charpos = tok_pos_pair.rfind('~');
+
+                    // POS tag
+                    assert(postag_charpos != string::npos);
+                    pos = tok_pos_pair.substr(postag_charpos + 1,
+                                              pred_charpos - 1 - postag_charpos);
+                    unsigned pos_id = pos_dict.Convert(pos);
+                    pos_vocab_size = pos_dict.size();
+                    current_posseq.push_back(pos_id);
+
+                    // Token
+                    token = tok_pos_pair.substr(0, postag_charpos);
+                    if (USE_LOWERWV) {
+                        transform(token.begin(), token.end(), token.begin(), ::tolower);
+                    }
+                    unsigned tok_id = tok_dict.Convert(token);
+                    token_vocab_size = tok_dict.size();
+                    ++num_tokens;
+                    current_sent.push_back(tok_id);
+
+                    // OOV Token
+                    // add an empty string for any token except OOVs (it is easy to
+                    // recover the surface form of non-OOV using int_words_map(id)).
+                    current_sent_oov.push_back("");
+                    if (tok_dict.is_unk(tok_id)) {
+                        if (USE_SPELLING) {
+                            cerr << "UNK word dict not implemented" << endl;
+                            cerr << "Spelling model will fail";
+                            exit(1);
+                        } else {
+                            // save the surface form of this OOV as a string
+                            current_sent_oov[current_sent_oov.size() - 1] =
+                                    token;
+                        }
+                    }
+
+                    // Predicate
+                    if (pred_charpos != string::npos) {
+                        pred = tok_pos_pair.substr(pred_charpos + 1);
+                        unsigned pred_id = lemma_dict.Convert(pred);
+                        current_predmap[current_sent.size() - 1] = pred_id;
+                        if (lemma_dict.is_unk(pred_id)) {
+                            oov_lemma_dict.Convert(pred);
+                            current_predmap_oov[current_sent.size() - 1] = pred;
+                        }
+                    }
+                } while (iss);
+                inp_line = false;
+            } else if (inp_line == false) {
+                if (!act_dict.Contains(predict_line)) {
+                    if (predict_line[1] == 'R' && predict_line[3] == 'A'
+                        && predict_line[4] == 'A') {
+                        // TODO(Swabha): Change - Nasty hack for replacing SR(AA) with SR(A1)
+                        predict_line = "SR(A1)";
+                    } else if (predict_line[0] == 'P' && predict_line[1] == 'R'
+                               && predict_line[2] == '(') {
+                        predict_line = UNK;
+                    } else {
+                        size_t sepIndex = predict_line.rfind('|');
+                        if (sepIndex == string::npos
+                            && !act_dict.Contains(predict_line)) {
+                            cerr << "Unknown action " << predict_line;
+                            act_name aname = get_act_name(predict_line);
+                            predict_line = some_label[aname];
+                            cerr << " replaced with " << predict_line << endl;
+                            //exit(1);
+                        } else {
+                            // These labels exist in the data because of projectivization
+                            // split the action into 2 parts - e.g. RA(X|Y) into RA(X) and RA(Y)
+                            cerr << predict_line << " fixable action" << endl;
+                            string a_str_left = predict_line.substr(0, sepIndex)
+                                                + ")";
+                            if (act_dict.Contains(a_str_left)) {
+                                predict_line = a_str_left;
+                            } else {
+                                size_t sepIndex2 = predict_line.rfind('(');
+                                string a_str_right = predict_line.substr(0,
+                                                                     sepIndex2)
+                                                     + predict_line.substr(sepIndex + 1,
+                                                                       predict_line.npos);
+                                if (act_dict.Contains(a_str_right)) {
+                                    predict_line = a_str_right;
+                                } else {
+                                    cerr << "What on earth is this? "
+                                         << predict_line << endl;
+                                    exit(1);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                unsigned act_idx = act_dict.Convert(predict_line);
+                vector<unsigned> a = correct_act_predict[sent_idx];
+                a.push_back(act_idx);
+                correct_act_predict[sent_idx] = a;
+
+            }
+        }
+        // Add the last sentence.
+        if (current_sent.size() > 0) {
+            tokens_predict[sent_idx] = current_sent;
+            oov_tokens_predict[sent_idx] = current_sent_oov;
+            pos_predict[sent_idx] = current_posseq;
+            preds_predict[sent_idx] = current_predmap;
+            oov_preds_predict[sent_idx] = current_predmap_oov;
+            sent_idx++;
+        }
+        predict_actions_file.close();
+        cerr << "done reading predict file\n";
+
+        num_sents_predict = sent_idx;
+        cerr << "#sents: " << num_sents_predict << endl;
+        cerr << "#tokens: " << num_tokens << endl;
+        cerr << "#types: " << token_vocab_size << endl;
+        cerr << "#POStags: " << pos_vocab_size << endl;
+//        cerr << "#actions: " << act_dict.size() << endl;
+//        cerr << "#action types: " << act_types.size() << endl;
         cerr << "#preds:" << lemma_dict.size() << endl;
         cerr << "#OOV preds:" << oov_lemma_dict.size() << endl;
     }
