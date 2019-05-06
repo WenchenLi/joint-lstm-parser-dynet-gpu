@@ -1,6 +1,5 @@
 # join syntactic and semantic parser
-Transition-based joint syntactic dependency parser and semantic role labeler using stack LSTM RNN architecture
-
+Transition-based joint syntactic dependency parser and semantic role labeler using stack LSTM RNN architecture (with the focus on chinese corpus)
 
 ## trained model download
 [official conll 2009 trained model](https://1drv.ms/u/s!Ao_Ao41kyU6Bgdwd_rDjhGHeFV6xNg)
